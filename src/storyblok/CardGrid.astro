@@ -1,0 +1,218 @@
+---
+/**
+ * CardGrid
+ * Storyblok block name: card_grid
+ *
+ * Fields: eyebrow, headline, subheadline, cards (blocks → card_item), columns
+ * card_item fields: image, eyebrow, title, description, cta_button (blocks → button, max 1)
+ */
+import { storyblokEditable } from '@storyblok/astro';
+import type { SbBlokData } from '@storyblok/astro';
+import { imageSize } from '../lib/storyblok-image';
+import Button from './Button.astro';
+
+interface CardItem extends SbBlokData {
+  image?: { filename: string; alt?: string };
+  eyebrow?: string;
+  title?: string;
+  description?: string;
+  cta_button?: Array<{ text?: string; link?: { url?: string; cached_url?: string } } & SbBlokData>;
+}
+
+const { blok } = Astro.props;
+
+const columns = blok.columns || 3;
+const bg      = blok.background || 'primary';
+---
+
+<section {...storyblokEditable(blok)} class:list={['card-grid', `card-grid--bg-${bg}`]}>
+  <div class="card-grid__inner">
+    {(blok.eyebrow || blok.headline || blok.subheadline) && (
+      <div class="card-grid__header">
+        {blok.eyebrow && <p class="card-grid__eyebrow">{blok.eyebrow}</p>}
+        {blok.headline && <h2 class="card-grid__headline">{blok.headline}</h2>}
+        {blok.subheadline && <p class="card-grid__sub">{blok.subheadline}</p>}
+      </div>
+    )}
+
+    <ul class:list={['card-grid__list', `card-grid__list--${columns}`]} role="list" data-reveal-stagger>
+      {(blok.cards as CardItem[])?.map((card) => {
+        const imageUrl = card.image?.filename
+          ? `${card.image.filename}/m/800x600/filters:quality(85)`
+          : null;
+
+        const cta = card.cta_button?.[0];
+        const ctaHref = cta?.link?.url || cta?.link?.cached_url;
+
+        return (
+          <li class="card" {...storyblokEditable(card)}>
+            {imageUrl && (
+              <div class="card__media" data-blur-up style={card.image?.filename ? `background-image:url('${card.image?.filename}/m/24x0/filters:blur(12)')` : undefined}>
+                <img {...imageSize(card.image?.filename, 800, 600)}
+                  src={imageUrl}
+                  alt={card.image?.alt ?? ''}
+                  class="card__img"
+                  loading="lazy"
+                />
+              </div>
+            )}
+            <div class="card__body">
+              {card.eyebrow && <p class="card__eyebrow">{card.eyebrow}</p>}
+              <h3 class="card__title">{card.title}</h3>
+              {card.description && <p class="card__desc">{card.description}</p>}
+              {cta?.text && ctaHref && (
+                <Button blok={{ ...cta, variant: 'link' }} />
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  </div>
+</section>
+
+<style>
+  .card-grid {
+    padding: var(--p-space-24) var(--p-space-8);
+    background: var(--p-color-bg-primary);
+  }
+
+  .card-grid--bg-secondary     { background: var(--p-color-bg-secondary); }
+  .card-grid--bg-accent-subtle { background: var(--p-color-bg-accent); }
+  .card-grid--bg-dark          { background: var(--p-color-bg-inverse); }
+
+  /* Cards keep their own light background regardless of section bg —
+     only the section-level header text needs to flip for dark. */
+  .card-grid--bg-dark .card-grid__eyebrow,
+  .card-grid--bg-dark .card-grid__headline,
+  .card-grid--bg-dark .card-grid__sub {
+    color: var(--p-color-text-on-dark);
+  }
+
+  .card-grid__inner {
+    max-width: var(--p-container-wide);
+    margin: 0 auto;
+  }
+
+  .card-grid__header {
+    max-width: var(--p-container-narrow);
+    margin: 0 auto var(--p-space-16);
+    text-align: center;
+  }
+
+  .card-grid__eyebrow {
+    font-size: var(--p-font-size-xs);
+    font-weight: var(--p-font-weight-medium);
+    letter-spacing: var(--p-font-tracking-wider);
+    text-transform: uppercase;
+    color: var(--p-color-text-tertiary);
+    margin-bottom: var(--p-space-3);
+  }
+
+  .card-grid__headline {
+    font-family: var(--p-font-display);
+    font-size: var(--p-font-size-3xl);
+    font-weight: var(--p-font-weight-semibold);
+    line-height: var(--p-font-leading-tight);
+    color: var(--p-color-text-primary);
+    margin-bottom: var(--p-space-4);
+  }
+
+  .card-grid__sub {
+    font-size: var(--p-font-size-lg);
+    font-weight: var(--p-font-weight-light);
+    color: var(--p-color-text-secondary);
+    line-height: var(--p-font-leading-normal);
+  }
+
+  .card-grid__list {
+    display: grid;
+    gap: var(--p-space-6);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .card-grid__list--2 { grid-template-columns: repeat(2, 1fr); }
+  .card-grid__list--3 { grid-template-columns: repeat(3, 1fr); }
+
+  @media (max-width: 900px) {
+    .card-grid__list--3 { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media (max-width: 580px) {
+    .card-grid__list--2,
+    .card-grid__list--3 { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--p-color-bg-primary);
+    border: var(--p-border-width-default) solid var(--p-color-border-default);
+    border-radius: var(--p-radius-card);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow var(--p-motion-base) var(--p-motion-ease);
+  }
+
+  .card:hover {
+    box-shadow: var(--p-shadow-md);
+  }
+
+  .card__media {
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background: var(--p-color-bg-secondary);
+  }
+
+  .card__img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform var(--p-motion-slow) var(--p-motion-ease);
+  }
+
+  .card:hover .card__img {
+    transform: scale(1.03);
+  }
+
+  .card__body {
+    padding: var(--p-space-6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--p-space-3);
+    flex: 1;
+  }
+
+  .card__eyebrow {
+    font-size: var(--p-font-size-xs);
+    font-weight: var(--p-font-weight-medium);
+    letter-spacing: var(--p-font-tracking-wider);
+    text-transform: uppercase;
+    color: var(--p-color-text-accent);
+  }
+
+  .card__title {
+    font-family: var(--p-font-body);
+    font-size: var(--p-font-size-lg);
+    font-weight: var(--p-font-weight-medium);
+    color: var(--p-color-text-primary);
+    line-height: var(--p-font-leading-snug);
+  }
+
+  .card__desc {
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-light);
+    color: var(--p-color-text-secondary);
+    line-height: var(--p-font-leading-normal);
+    flex: 1;
+  }
+
+  /* The CTA is a real Button (variant="link") now, not hand-rolled arrow-link
+     CSS — this just adds the extra breathing room on top of .card__body's
+     own gap that the old .card__cta had. */
+  .card__body :global(.btn--link) {
+    margin-top: var(--p-space-2);
+  }
+</style>

@@ -1,0 +1,358 @@
+---
+/**
+ * TestimonialBlock
+ * Storyblok block name: testimonials
+ *
+ * Fields: eyebrow, headline, items (reference → testimonial stories, multi),
+ * layout
+ *
+ * `items` is a reference field (source: internal_stories, filter_content_type:
+ * testimonial), not nested blocks — a testimonial is authored once as its own
+ * story under the "Testimonials" folder and picked here by any number of
+ * pages, matching the WordPress/ACF Pro "relationship field to a reusable
+ * post type" pattern rather than re-typing the same quote per page. Editing a
+ * testimonial's quote/author/role/avatar happens on that story itself, not
+ * inline on this block — every page referencing it picks up the change.
+ *
+ * `resolve_relations=testimonials.items` on the page-level story fetch
+ * (see src/pages/[...slug].astro / index.astro) resolves `items` to full
+ * story objects in one request. The Storyblok live-preview bridge does NOT
+ * apply that param to the payload it pushes into the editor, so `items`
+ * arrives as bare UUID strings there — resolved defensively below via a
+ * `by_uuids` lookup so the block still renders correctly inside the Visual
+ * Editor, not just on a normal page load.
+ *
+ * testimonial (content type) fields: quote, author, role, avatar
+ */
+import { storyblokEditable, useStoryblokApi } from '@storyblok/astro';
+import { imageSize } from '../lib/storyblok-image';
+
+interface TestimonialContent {
+  quote?: string;
+  author?: string;
+  role?: string;
+  avatar?: { filename: string; alt?: string };
+}
+
+interface TestimonialStory {
+  uuid?: string;
+  content?: TestimonialContent;
+}
+
+const { blok } = Astro.props;
+
+const layout = blok.layout || 'grid';
+const bg     = blok.background || 'primary';
+
+const rawItems = (blok.items ?? []) as (string | TestimonialStory)[];
+const unresolvedUuids = rawItems.filter((item): item is string => typeof item === 'string');
+
+const resolvedByUuid = new Map<string, TestimonialStory>();
+if (unresolvedUuids.length) {
+  const api = useStoryblokApi();
+  const { data } = await api.get('cdn/stories', {
+    by_uuids: unresolvedUuids.join(','),
+    version: 'draft',
+  });
+  for (const story of data.stories ?? []) resolvedByUuid.set(story.uuid, story);
+}
+
+const testimonials: TestimonialContent[] = rawItems
+  .map((item) => (typeof item === 'string' ? resolvedByUuid.get(item) : item))
+  .map((story) => story?.content)
+  .filter((content): content is TestimonialContent => Boolean(content));
+---
+
+<section {...storyblokEditable(blok)} class:list={['testimonials', `testimonials--${layout}`, `testimonials--bg-${bg}`]}>
+  <div class="testimonials__inner">
+    {(blok.eyebrow || blok.headline) && (
+      <div class="testimonials__header">
+        {blok.eyebrow && <p class="testimonials__eyebrow">{blok.eyebrow}</p>}
+        {blok.headline && <h2 class="testimonials__headline">{blok.headline}</h2>}
+      </div>
+    )}
+
+    <ul
+      class="testimonials__grid"
+      role="list"
+      data-reveal-stagger
+      data-testimonial-track
+    >
+      {testimonials.map((item, i) => (
+        <li
+          class="testimonial-card"
+          data-testimonial-slide
+          aria-hidden={layout === 'carousel' && i !== 0 ? 'true' : undefined}
+        >
+          <blockquote class="testimonial-card__quote">
+            <p>"{item.quote}"</p>
+          </blockquote>
+          <footer class="testimonial-card__footer">
+            {item.avatar?.filename && (
+              <img {...imageSize(item.avatar?.filename, 80, 80)}
+                src={`${item.avatar.filename}/m/80x80/filters:quality(85)`}
+                alt={item.author ?? ''}
+                class="testimonial-card__avatar"
+                loading="lazy"
+              />
+            )}
+            <div class="testimonial-card__attr">
+              <cite class="testimonial-card__author">{item.author}</cite>
+              {item.role && <span class="testimonial-card__role">{item.role}</span>}
+            </div>
+          </footer>
+        </li>
+      ))}
+    </ul>
+
+    {layout === 'carousel' && testimonials.length > 1 && (
+      <div class="testimonials__dots" role="tablist" aria-label="Testimonials" data-testimonial-dots>
+        {testimonials.map((item, i) => (
+          <button
+            type="button"
+            class="testimonials__dot"
+            role="tab"
+            aria-selected={i === 0 ? 'true' : 'false'}
+            aria-label={`Show testimonial from ${item.author ?? `slide ${i + 1}`}`}
+            data-testimonial-dot
+          />
+        ))}
+      </div>
+    )}
+  </div>
+</section>
+
+{layout === 'carousel' && (
+  <script>
+    // One <script> runs once for the whole page and wires up every carousel
+    // section on it — several testimonial blocks can appear on one page.
+    const ROTATE_MS = 5000;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    document.querySelectorAll<HTMLElement>('.testimonials--carousel').forEach((section) => {
+      const track = section.querySelector<HTMLElement>('[data-testimonial-track]');
+      const slides = Array.from(section.querySelectorAll<HTMLElement>('[data-testimonial-slide]'));
+      const dots = Array.from(section.querySelectorAll<HTMLButtonElement>('[data-testimonial-dot]'));
+      if (!track || slides.length < 2) return;
+
+      let index = 0;
+      let timer: ReturnType<typeof setInterval> | null = null;
+
+      function show(next: number) {
+        slides[index].classList.remove('is-active');
+        slides[index].setAttribute('aria-hidden', 'true');
+        dots[index]?.setAttribute('aria-selected', 'false');
+
+        index = (next + slides.length) % slides.length;
+
+        slides[index].classList.add('is-active');
+        slides[index].removeAttribute('aria-hidden');
+        dots[index]?.setAttribute('aria-selected', 'true');
+      }
+
+      function start() {
+        if (reduceMotion || timer) return;
+        timer = setInterval(() => show(index + 1), ROTATE_MS);
+      }
+
+      function stop() {
+        if (timer) {
+          clearInterval(timer);
+          timer = null;
+        }
+      }
+
+      slides[0].classList.add('is-active');
+
+      dots.forEach((dot, i) => {
+        dot.addEventListener('click', () => {
+          show(i);
+          // A manual pick is a deliberate interruption — restart the clock
+          // from here rather than letting a near-due rotation fire right
+          // after, which would read as the click being ignored.
+          stop();
+          start();
+        });
+      });
+
+      // Hover and keyboard focus both count as "the user is engaging with
+      // this" — pausing only on hover would strand keyboard users on a
+      // slide that keeps changing out from under them mid-read.
+      section.addEventListener('mouseenter', stop);
+      section.addEventListener('mouseleave', start);
+      section.addEventListener('focusin', stop);
+      section.addEventListener('focusout', start);
+
+      start();
+    });
+  </script>
+)}
+
+<style>
+  .testimonials {
+    padding: var(--p-space-24) var(--p-space-8);
+    background: var(--p-color-bg-primary);
+  }
+
+  .testimonials--bg-secondary     { background: var(--p-color-bg-secondary); }
+  .testimonials--bg-accent-subtle { background: var(--p-color-bg-accent); }
+  .testimonials--bg-dark          { background: var(--p-color-bg-inverse); }
+
+  /* Testimonial cards keep their own light background regardless of
+     section bg — only the header and the carousel dots (which sit
+     directly on the section bg) need to flip for dark. */
+  .testimonials--bg-dark .testimonials__eyebrow,
+  .testimonials--bg-dark .testimonials__headline {
+    color: var(--p-color-text-on-dark);
+  }
+
+  .testimonials--bg-dark .testimonials__dot {
+    background: var(--p-color-border-inverse);
+  }
+
+  .testimonials__inner {
+    max-width: var(--p-container-wide);
+    margin: 0 auto;
+  }
+
+  .testimonials__header {
+    max-width: var(--p-container-narrow);
+    margin: 0 auto var(--p-space-16);
+    text-align: center;
+  }
+
+  .testimonials__eyebrow {
+    font-size: var(--p-font-size-xs);
+    font-weight: var(--p-font-weight-medium);
+    letter-spacing: var(--p-font-tracking-wider);
+    text-transform: uppercase;
+    color: var(--p-color-text-tertiary);
+    margin-bottom: var(--p-space-3);
+  }
+
+  .testimonials__headline {
+    font-family: var(--p-font-display);
+    font-size: var(--p-font-size-3xl);
+    font-weight: var(--p-font-weight-semibold);
+    line-height: var(--p-font-leading-tight);
+    color: var(--p-color-text-primary);
+  }
+
+  .testimonials__grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--p-space-6);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  @media (max-width: 900px) {
+    .testimonials__grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media (max-width: 580px) {
+    .testimonials__grid { grid-template-columns: 1fr; }
+  }
+
+  /* Carousel: every slide occupies the same grid cell (stacked, not laid
+     out side by side), so the container's height is simply the tallest
+     slide — no JS height measurement needed to avoid layout jump. Only
+     .is-active is visible; the rest are cross-faded out and unclickable. */
+  .testimonials--carousel .testimonials__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    max-width: var(--p-container-narrow);
+    margin: 0 auto;
+  }
+
+  .testimonials--carousel .testimonial-card {
+    grid-area: 1 / 1;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity var(--p-motion-duration-slow) var(--p-motion-ease);
+  }
+
+  .testimonials--carousel .testimonial-card.is-active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .testimonials__dots {
+    display: flex;
+    justify-content: center;
+    gap: var(--p-space-3);
+    margin-top: var(--p-space-8);
+  }
+
+  .testimonials__dot {
+    width: var(--p-space-2);
+    height: var(--p-space-2);
+    padding: 0;
+    border: none;
+    border-radius: var(--p-radius-full);
+    background: var(--p-color-border-default);
+    cursor: pointer;
+    transition: background var(--p-motion-base) var(--p-motion-ease);
+  }
+
+  .testimonials__dot[aria-selected='true'] {
+    background: var(--p-color-accent-default);
+  }
+
+  .testimonial-card {
+    background: var(--p-color-bg-secondary);
+    border: var(--p-border-width-default) solid var(--p-color-border-default);
+    border-radius: var(--p-radius-card);
+    padding: var(--p-space-8);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: var(--p-space-6);
+  }
+
+  .testimonial-card__quote {
+    font-family: var(--p-font-display);
+    font-size: var(--p-font-size-lg);
+    font-weight: var(--p-font-weight-regular);
+    line-height: var(--p-font-leading-snug);
+    color: var(--p-color-text-primary);
+    font-style: italic;
+    margin: 0;
+  }
+
+  .testimonial-card__footer {
+    display: flex;
+    align-items: center;
+    gap: var(--p-space-4);
+  }
+
+  .testimonial-card__avatar {
+    width: 2.75rem; /* 44px */
+    height: 2.75rem; /* 44px */
+    border-radius: var(--p-radius-full);
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+
+  .testimonial-card__attr {
+    display: flex;
+    flex-direction: column;
+    gap: var(--p-space-1);
+  }
+
+  .testimonial-card__author {
+    font-style: normal;
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-medium);
+    color: var(--p-color-text-primary);
+  }
+
+  .testimonial-card__role {
+    font-size: var(--p-font-size-xs);
+    color: var(--p-color-text-tertiary);
+    letter-spacing: var(--p-font-tracking-wide);
+  }
+</style>

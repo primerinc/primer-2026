@@ -1,0 +1,198 @@
+---
+/**
+ * LogoBar
+ * Storyblok block name: logo_bar
+ *
+ * Fields: eyebrow, logos (blocks → logo_item: image, alt, url), display
+ */
+import { storyblokEditable } from '@storyblok/astro';
+import { imageSize } from '../lib/storyblok-image';
+
+interface LogoItem {
+  _uid: string;
+  image?: { filename: string; alt?: string };
+  alt?: string;
+  url?: string;
+}
+
+const { blok } = Astro.props;
+
+const isMarquee = (blok.display ?? 'grid') === 'marquee';
+const logos: LogoItem[] = blok.logos ?? [];
+
+// A single duplication (2x) only fills the animated band if the logo set is
+// already wide — with few/narrow logos (a handful of small SVGs is the
+// common case) two copies together can be much narrower than the viewport,
+// so the track runs out of content partway through the loop and leaves a
+// visible gap. The seamless-loop technique needs HALF the total repeated
+// track (i.e. repeats/2 copies of the logo set) to be at least as wide as
+// the viewport, or there's a gap at some point in every cycle — not just
+// wider than the un-doubled set. Measured against this project's own demo
+// content (3 small logos, ~406px per pass): 6 repeats (3 per half = 1218px)
+// still fell short of a common 1440px desktop viewport; 10 repeats (5 per
+// half = ~2030px) comfortably covers ordinary desktop widths. A client
+// with more/wider logos needs proportionally fewer repeats to hit the same
+// coverage, but there's no way to measure actual rendered width at Astro's
+// build/SSR time, so this stays a fixed, generously-sized constant rather
+// than a formula tuned to one demo's logo count.
+const MARQUEE_REPEATS = 10;
+const marqueeLogos: LogoItem[] = Array.from({ length: MARQUEE_REPEATS }, () => logos).flat();
+
+function imgSrc(logo: LogoItem) {
+  return logo.image?.filename
+    ? `${logo.image.filename}/m/200x80/filters:quality(90)`
+    : '';
+}
+---
+
+<section {...storyblokEditable(blok)} class:list={['logo-bar', isMarquee && 'logo-bar--marquee']}>
+  {blok.eyebrow && <p class="logo-bar__eyebrow">{blok.eyebrow}</p>}
+
+  {isMarquee && (
+    <div class="logo-bar__track-wrap">
+      <ul class="logo-bar__track" role="list" aria-label="Client logos">
+        {marqueeLogos.map((logo, i) => (
+          <li class="logo-bar__item">
+            {logo.url && (
+              <a href={logo.url} class="logo-bar__link" aria-label={logo.alt} tabindex={i >= logos.length ? -1 : 0}>
+                <img {...imageSize(logo.image?.filename, 200, 80)} src={imgSrc(logo)} alt={logo.alt ?? ''} class="logo-bar__img" loading="lazy" />
+              </a>
+            )}
+            {!logo.url && (
+              <img {...imageSize(logo.image?.filename, 200, 80)} src={imgSrc(logo)} alt={i < logos.length ? (logo.alt ?? '') : ''} class="logo-bar__img" loading="lazy" />
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )}
+
+  {!isMarquee && (
+    <div class="logo-bar__inner">
+      <ul class="logo-bar__list" role="list">
+        {logos.map((logo) => (
+          <li class="logo-bar__item" {...storyblokEditable(logo as any)}>
+            {logo.url && (
+              <a href={logo.url} class="logo-bar__link" aria-label={logo.alt}>
+                <img {...imageSize(logo.image?.filename, 200, 80)} src={imgSrc(logo)} alt={logo.alt ?? ''} class="logo-bar__img" loading="lazy" />
+              </a>
+            )}
+            {!logo.url && (
+              <img {...imageSize(logo.image?.filename, 200, 80)} src={imgSrc(logo)} alt={logo.alt ?? ''} class="logo-bar__img" loading="lazy" />
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )}
+</section>
+
+<style>
+  .logo-bar {
+    padding: var(--p-space-16) var(--p-space-8);
+    background: var(--p-color-bg-secondary);
+    border-top: var(--p-border-width-default) solid var(--p-color-border-subtle);
+    border-bottom: var(--p-border-width-default) solid var(--p-color-border-subtle);
+  }
+
+  .logo-bar__eyebrow {
+    font-size: var(--p-font-size-xs);
+    font-weight: var(--p-font-weight-medium);
+    letter-spacing: var(--p-font-tracking-wider);
+    text-transform: uppercase;
+    color: var(--p-color-text-tertiary);
+    text-align: center;
+    margin-bottom: var(--p-space-8);
+  }
+
+  /* ── Grid layout ── */
+  .logo-bar__inner {
+    max-width: var(--p-container-default);
+    margin: 0 auto;
+  }
+
+  .logo-bar__list {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--p-space-10);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  /* ── Marquee layout ── */
+  .logo-bar--marquee {
+    padding-inline: 0;
+    overflow: hidden;
+  }
+
+  .logo-bar--marquee .logo-bar__eyebrow {
+    padding-inline: var(--p-space-8);
+  }
+
+  .logo-bar__track-wrap {
+    /* Mask gradient, not a visible color — `black` here means "fully
+       opaque/visible", `transparent` means "fully hidden" (the mask's
+       alpha channel, not paint). Left as a literal rather than a design
+       color token on purpose: it must always mean "opaque" regardless of
+       theme, unlike an actual on-screen color choice. */
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+  }
+
+  .logo-bar__track {
+    display: flex;
+    align-items: center;
+    gap: var(--p-space-20);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    width: max-content;
+    animation: logo-marquee 125s linear infinite;
+  }
+
+  .logo-bar__track-wrap:hover .logo-bar__track {
+    animation-play-state: paused;
+  }
+
+  @keyframes logo-marquee {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .logo-bar__track {
+      animation: none;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: auto;
+      padding-inline: var(--p-space-8);
+    }
+  }
+
+  /* ── Shared ── */
+  .logo-bar__item {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .logo-bar__link { display: block; }
+
+  .logo-bar__img {
+    height: 2.25rem; /* 36px */
+    width: auto;
+    max-width: 8.75rem; /* 140px */
+    object-fit: contain;
+    opacity: 0.55;
+    filter: grayscale(100%);
+    transition: opacity var(--p-motion-base) var(--p-motion-ease), filter var(--p-motion-base) var(--p-motion-ease);
+  }
+
+  .logo-bar__link:hover .logo-bar__img {
+    opacity: 0.8;
+    filter: grayscale(0%);
+  }
+</style>

@@ -1,0 +1,40 @@
+---
+/**
+ * Page
+ * Root renderer for the page, resource, and campaign_page content types.
+ * All three are structurally identical (just a body of Blocks) — content-type-specific
+ * fields like title, resource_type, and seo are read at the routing layer
+ * (src/pages/[...slug].astro), not here.
+ */
+import { storyblokEditable } from '@storyblok/astro';
+import ContentGate from './ContentGate.astro';
+import BodyBlocks from './BodyBlocks.astro';
+
+const { blok } = Astro.props;
+
+// gate_enabled only exists on resource/campaign_page's schema — undefined
+// (falsy) on plain `page` entries, so this is a no-op there.
+const gated = Boolean(blok.gate_enabled);
+const gateKey = `hubspot_gate_${Astro.url.pathname}`;
+---
+
+{/*
+  Each top-level section opts into a scroll reveal here rather than in the
+  components themselves, so every block — including ones added later — gets it
+  without repeating the attribute nineteen times. Grids opt their children into
+  a stagger separately, via data-reveal-stagger on the item container.
+
+  The first block is excluded: it's above the fold on arrival, and fading in
+  the hero would delay the very thing the visitor came for. That exclusion
+  still applies when the page is gated — the whole body sits behind the gate
+  either way, but individual blocks keep their own reveal timing once unlocked.
+*/}
+<main {...storyblokEditable(blok)}>
+  {gated ? (
+    <ContentGate blok={blok} gateKey={gateKey}>
+      <BodyBlocks body={blok.body} />
+    </ContentGate>
+  ) : (
+    <BodyBlocks body={blok.body} />
+  )}
+</main>

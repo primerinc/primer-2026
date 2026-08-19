@@ -1,0 +1,307 @@
+---
+/**
+ * Footer
+ * Storyblok block name: footer
+ *
+ * Fields: logo, tagline, columns (→ footer_column), social_links (→ social_link),
+ *         newsletter_enabled, newsletter_heading, copyright, legal_links (→ nav_link)
+ */
+import { storyblokEditable } from '@storyblok/astro';
+import { imageSize } from '../lib/storyblok-image';
+import { socialIcons } from '../lib/social-icons';
+
+const { blok } = Astro.props;
+
+const logoUrl          = blok.logo?.filename;
+const logoAlt          = blok.logo?.alt || 'Logo';
+const columns          = blok.columns || [];
+const socialLinks      = blok.social_links || [];
+const legalLinks       = blok.legal_links || [];
+const newsletterOn     = blok.newsletter_enabled ?? false;
+---
+
+<footer class="site-footer" {...storyblokEditable(blok)}>
+  <div class="site-footer__inner">
+
+    <div class="site-footer__top">
+
+      <div class="site-footer__brand">
+        <a href="/" class="site-footer__logo">
+          {logoUrl
+            ? <img src={`${logoUrl}/m/200x0`} alt={logoAlt} {...imageSize(logoUrl, 200, 0)} />
+            : <span class="site-footer__logo-text">{logoAlt}</span>
+          }
+        </a>
+        {blok.tagline && <p class="site-footer__tagline">{blok.tagline}</p>}
+
+        {socialLinks.length > 0 && (
+          <div class="site-footer__social">
+            {socialLinks.map((s: any) => {
+              const href = s.url?.url || s.url?.cached_url || '#';
+              const platform = s.platform?.value ?? s.platform ?? '';
+              const icon = socialIcons[platform.toLowerCase()] || '';
+              return (
+                <a
+                  href={href}
+                  class="site-footer__social-link"
+                  aria-label={platform}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  {...storyblokEditable(s)}
+                  set:html={icon}
+                />
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div class="site-footer__columns">
+        {columns.map((col: any) => {
+          const links = col.links || [];
+          return (
+            <div class="footer-col" {...storyblokEditable(col)}>
+              {col.heading && <p class="footer-col__heading">{col.heading}</p>}
+              <ul class="footer-col__list" role="list">
+                {links.map((link: any) => {
+                  const href = link.link?.url || link.link?.cached_url || '#';
+                  return (
+                    <li {...storyblokEditable(link)}>
+                      <a href={href} class="footer-col__link">{link.label}</a>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
+
+        {newsletterOn && (
+          <div class="footer-col footer-col--newsletter">
+            <p class="footer-col__heading">{blok.newsletter_heading || 'Stay in the loop'}</p>
+            <form class="newsletter-form" onsubmit="return false;">
+              <input
+                type="email"
+                class="newsletter-form__input"
+                placeholder="Your email address"
+                aria-label="Email address"
+                required
+              />
+              <button type="submit" class="newsletter-form__btn">Subscribe</button>
+            </form>
+          </div>
+        )}
+      </div>
+
+    </div>
+
+    <div class="site-footer__bottom">
+      {blok.copyright && <p class="site-footer__copyright">{blok.copyright}</p>}
+      {legalLinks.length > 0 && (
+        <ul class="site-footer__legal" role="list">
+          {legalLinks.map((link: any) => {
+            const href = link.link?.url || link.link?.cached_url || '#';
+            return (
+              <li {...storyblokEditable(link)}>
+                <a href={href} class="site-footer__legal-link">{link.label}</a>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    background: var(--p-color-bg-inverse);
+    color: var(--p-color-text-inverse);
+    padding: var(--p-space-16) var(--p-space-6) 0;
+  }
+
+  .site-footer__inner {
+    max-width: var(--p-container-wide);
+    margin: 0 auto;
+  }
+
+  /* ── Top section ────────────────────────────────────────────── */
+  .site-footer__top {
+    display: grid;
+    grid-template-columns: 15rem 1fr; /* 240px */
+    gap: var(--p-space-16);
+    padding-bottom: var(--p-space-12);
+    border-bottom: var(--p-border-width-default) solid color-mix(in srgb, var(--p-color-text-inverse) 10%, transparent);
+  }
+
+  /* ── Brand column ───────────────────────────────────────────── */
+  .site-footer__logo {
+    display: inline-flex;
+    margin-bottom: var(--p-space-4);
+    text-decoration: none;
+  }
+
+  .site-footer__logo img { height: 2.25rem; width: auto; display: block; } /* 36px */
+
+  .site-footer__logo-text {
+    font-family: var(--p-font-display);
+    font-size: var(--p-font-size-lg);
+    font-weight: var(--p-font-weight-semibold);
+    color: var(--p-color-text-inverse);
+  }
+
+  .site-footer__tagline {
+    font-family: var(--p-font-body);
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-light);
+    color: color-mix(in srgb, var(--p-color-text-inverse) 60%, transparent);
+    line-height: var(--p-font-leading-normal);
+    margin-bottom: var(--p-space-6);
+  }
+
+  /* ── Social ─────────────────────────────────────────────────── */
+  .site-footer__social {
+    display: flex;
+    gap: var(--p-space-3);
+    margin-top: var(--p-space-2);
+  }
+
+  .site-footer__social-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem; /* 36px */
+    height: 2.25rem; /* 36px */
+    border-radius: var(--p-radius-sm);
+    color: color-mix(in srgb, var(--p-color-text-inverse) 60%, transparent);
+    transition: color var(--p-motion-hover) var(--p-motion-ease), background var(--p-motion-hover) var(--p-motion-ease);
+    text-decoration: none;
+  }
+
+  .site-footer__social-link:hover {
+    color: var(--p-color-text-inverse);
+    background: color-mix(in srgb, var(--p-color-text-inverse) 10%, transparent);
+  }
+
+  /* ── Link columns ───────────────────────────────────────────── */
+  .site-footer__columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.75rem, 1fr)); /* 140px */
+    gap: var(--p-space-8);
+  }
+
+  .footer-col__heading {
+    font-family: var(--p-font-body);
+    font-size: var(--p-font-size-xs);
+    font-weight: var(--p-font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: var(--p-font-tracking-wide);
+    color: color-mix(in srgb, var(--p-color-text-inverse) 45%, transparent);
+    margin-bottom: var(--p-space-4);
+  }
+
+  .footer-col__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--p-space-3);
+  }
+
+  .footer-col__link {
+    font-family: var(--p-font-body);
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-regular);
+    color: color-mix(in srgb, var(--p-color-text-inverse) 70%, transparent);
+    text-decoration: none;
+    transition: color var(--p-motion-hover) var(--p-motion-ease);
+  }
+
+  .footer-col__link:hover { color: var(--p-color-text-inverse); }
+
+  /* ── Newsletter ─────────────────────────────────────────────── */
+  .newsletter-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--p-space-2);
+  }
+
+  .newsletter-form__input {
+    background: color-mix(in srgb, var(--p-color-text-inverse) 8%, transparent);
+    border: var(--p-border-width-default) solid color-mix(in srgb, var(--p-color-text-inverse) 15%, transparent);
+    border-radius: var(--p-radius-sm);
+    padding: var(--p-space-2) var(--p-space-3);
+    font-family: var(--p-font-body);
+    font-size: var(--p-font-size-sm);
+    color: var(--p-color-text-inverse);
+    width: 100%;
+  }
+
+  .newsletter-form__input::placeholder { color: color-mix(in srgb, var(--p-color-text-inverse) 40%, transparent); }
+  .newsletter-form__input:focus { outline: none; border-color: var(--p-color-accent-default); }
+
+  .newsletter-form__btn {
+    background: var(--p-color-accent-default);
+    color: var(--p-color-text-on-accent);
+    border: none;
+    border-radius: var(--p-radius-button);
+    padding: var(--p-space-2) var(--p-space-4);
+    font-family: var(--p-font-body);
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-medium);
+    cursor: pointer;
+    transition: opacity var(--p-motion-base) var(--p-motion-ease);
+  }
+
+  .newsletter-form__btn:hover { opacity: 0.85; }
+
+  /* ── Bottom bar ─────────────────────────────────────────────── */
+  .site-footer__bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--p-space-6);
+    padding: var(--p-space-6) 0;
+    flex-wrap: wrap;
+  }
+
+  .site-footer__copyright {
+    font-family: var(--p-font-body);
+    font-size: var(--p-font-size-xs);
+    color: color-mix(in srgb, var(--p-color-text-inverse) 40%, transparent);
+  }
+
+  .site-footer__legal {
+    display: flex;
+    gap: var(--p-space-6);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    flex-wrap: wrap;
+  }
+
+  .site-footer__legal-link {
+    font-family: var(--p-font-body);
+    font-size: var(--p-font-size-xs);
+    color: color-mix(in srgb, var(--p-color-text-inverse) 40%, transparent);
+    text-decoration: none;
+    transition: color var(--p-motion-hover) var(--p-motion-ease);
+  }
+
+  .site-footer__legal-link:hover { color: color-mix(in srgb, var(--p-color-text-inverse) 70%, transparent); }
+
+  /* ── Responsive ─────────────────────────────────────────────── */
+  @media (max-width: 768px) {
+    .site-footer__top {
+      grid-template-columns: 1fr;
+      gap: var(--p-space-10);
+    }
+
+    .site-footer__bottom {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+</style>

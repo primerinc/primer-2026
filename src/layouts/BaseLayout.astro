@@ -1,0 +1,559 @@
+---
+import '../../tokens/dist/tokens.css';
+import { ClientRouter } from 'astro:transitions';
+import { useStoryblokApi } from '@storyblok/astro';
+import StoryblokComponent from '@storyblok/astro/StoryblokComponent.astro';
+import { organization, website, graph, type SchemaNode } from '../lib/schema';
+
+/**
+ * Page transition — a short lift-and-fade rather than a plain crossfade.
+ * Written as an Astro animation object rather than raw ::view-transition-* CSS so
+ * the same definition drives the JS fallback in browsers without the View
+ * Transitions API. Durations/easings come from the motion tokens, so the feel is
+ * tunable from the design system rather than hard-coded here.
+ *
+ * Out is deliberately faster than in (accelerate away, decelerate back), which
+ * reads as responsive; a symmetrical curve feels sluggish at these durations.
+ */
+/**
+ * Storyblok's Visual Editor loads the site in an iframe and drives it with the
+ * bridge script. Client-side routing swaps the DOM out from under that, so the
+ * router is skipped there: editors get plain, predictable navigation, and real
+ * visitors still get the transition. Detected server-side from the query param
+ * the editor always appends.
+ */
+const inVisualEditor = Astro.url.searchParams.has('_storyblok');
+
+const pageTransition = {
+  forwards: {
+    old: { name: 'primer-page-out', duration: 'var(--p-motion-duration-base)',
+           easing: 'var(--p-motion-easing-ease-in)', fillMode: 'both' },
+    new: { name: 'primer-page-in',  duration: 'var(--p-motion-duration-slow)',
+           easing: 'var(--p-motion-easing-ease-out)', fillMode: 'both' },
+  },
+  backwards: {
+    old: { name: 'primer-page-out', duration: 'var(--p-motion-duration-base)',
+           easing: 'var(--p-motion-easing-ease-in)', fillMode: 'both' },
+    new: { name: 'primer-page-in',  duration: 'var(--p-motion-duration-slow)',
+           easing: 'var(--p-motion-easing-ease-out)', fillMode: 'both' },
+  },
+};
+
+interface Props {
+  title: string;
+  description?: string;
+  ogImage?: string;
+  noIndex?: boolean;
+  canonicalUrl?: string;
+  hideNav?: boolean;
+  hideFooter?: boolean;
+  /** Page-specific JSON-LD nodes (e.g. an Article) merged into the site graph. */
+  schemaNodes?: SchemaNode[];
+}
+
+const {
+  title,
+  description = '',
+  ogImage = '',
+  noIndex = false,
+  canonicalUrl = '',
+  hideNav = false,
+  hideFooter = false,
+  schemaNodes = [],
+} = Astro.props;
+
+const canonicalURL = canonicalUrl || (Astro.site ? new URL(Astro.url.pathname, Astro.site) : null);
+
+const storyblokApi = useStoryblokApi();
+let headerBlok = null;
+let footerBlok = null;
+let siteName: string | null = null;
+let gtmContainerId: string | null = null;
+let headScripts: string | null = null;
+let bodyScripts: string | null = null;
+
+try {
+  const { data } = await storyblokApi.get('cdn/stories/config', {
+    version: 'draft',
+  });
+  headerBlok     = data?.story?.content?.header?.[0] ?? null;
+  footerBlok     = data?.story?.content?.footer?.[0] ?? null;
+  siteName       = data?.story?.content?.site_name ?? null;
+  gtmContainerId = data?.story?.content?.gtm_container_id || null;
+  headScripts    = data?.story?.content?.head_scripts || null;
+  bodyScripts    = data?.story?.content?.body_scripts || null;
+} catch (e) {
+  // Config story not found — header/footer render nothing
+}
+
+/**
+ * head_scripts is deliberately rendered BEFORE the GTM snippet below, not after.
+ * If a client needs cookie consent, their CMP (Cookiebot/OneTrust/CookieYes/etc.)
+ * snippet — or a bare Google Consent Mode default-state call — goes in
+ * head_scripts, so consent defaults are established before GTM loads and reads
+ * them. Getting this ordering right is the whole reason GTM has its own
+ * first-class field instead of just being one more thing pasted into
+ * head_scripts: it fixes the load order by construction rather than relying on
+ * every client remembering to paste things in the right sequence.
+ */
+const gtmSnippet = gtmContainerId
+  ? `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer',${JSON.stringify(gtmContainerId)});`
+  : null;
+
+/**
+ * Site-wide structured data. The organisation is described once per page and
+ * referenced by @id from anything else in the graph, so an Article says who
+ * published it without restating the publisher's details.
+ *
+ * Social profiles come from the footer the client already fills in, rather than
+ * a second set of fields that would inevitably drift out of sync with it.
+ */
+const origin = Astro.site?.origin ?? Astro.url.origin;
+
+const sameAs = (footerBlok?.social_links ?? [])
+  .map((s: any) => s?.url?.url || s?.url?.cached_url)
+  .filter(Boolean);
+
+const siteSchema = siteName
+  ? graph([
+      organization({
+        origin,
+        name: siteName,
+        logo: footerBlok?.logo?.filename || undefined,
+        sameAs,
+      }),
+      website(origin, siteName),
+      ...schemaNodes,
+    ])
+  : graph(schemaNodes);
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+  <title>{title}</title>
+  {description && <meta name="description" content={description} />}
+  {canonicalURL && <link rel="canonical" href={canonicalURL} />}
+  {noIndex && <meta name="robots" content="noindex, nofollow" />}
+
+  {ogImage && <meta property="og:image" content={ogImage} />}
+  <meta property="og:title" content={title} />
+  {description && <meta property="og:description" content={description} />}
+  <meta property="og:type" content="website" />
+
+  {siteSchema && <script type="application/ld+json" is:inline set:html={siteSchema} />}
+
+  {/* Order matters: a client's consent-management snippet (Cookiebot/OneTrust/
+      CookieYes/a bare Consent Mode default call) belongs in head_scripts, and it
+      must run before GTM reads consent state — see the comment above gtmSnippet. */}
+  {!inVisualEditor && headScripts && <Fragment set:html={headScripts} />}
+  {!inVisualEditor && gtmSnippet && <script is:inline set:html={gtmSnippet} />}
+
+  {!inVisualEditor && <ClientRouter fallback="animate" />}
+
+  {/* Marks the document as reveal-capable before first paint. The hidden state is
+      scoped to this class, so if scripting is unavailable the content simply
+      renders — it can never be left invisible by a script that didn't run. */}
+  {!inVisualEditor && <script is:inline>document.documentElement.classList.add('has-reveal');</script>}
+</head>
+<body>
+  {/* Per Google's own placement guidance, as high in body as the markup allows —
+      covers visitors with JS disabled, for whom the head script never ran. */}
+  {!inVisualEditor && gtmContainerId && (
+    <noscript>
+      <iframe
+        src={`https://www.googletagmanager.com/ns.html?id=${encodeURIComponent(gtmContainerId)}`}
+        height="0"
+        width="0"
+        style="display:none;visibility:hidden"
+      />
+    </noscript>
+  )}
+  {!inVisualEditor && bodyScripts && <Fragment set:html={bodyScripts} />}
+
+  {/* First focusable element on the page, so keyboard and switch users can jump
+      past a long nav on every page rather than tabbing through it each time. */}
+  <a class="skip-link" href="#main-content">Skip to content</a>
+
+  {/* transition:persist keeps the real header/footer nodes across navigations, so
+      they never flash or re-animate — only the page body moves. */}
+  {!hideNav && headerBlok && (
+    <div transition:persist="site-header">
+      <StoryblokComponent blok={headerBlok} />
+    </div>
+  )}
+
+  <div class="page-body" id="main-content" tabindex="-1" transition:animate={pageTransition}>
+    <slot />
+  </div>
+
+  {!hideFooter && footerBlok && (
+    <div id="site-footer" transition:persist="site-footer">
+      <StoryblokComponent blok={footerBlok} />
+    </div>
+  )}
+
+  {!inVisualEditor && (
+    <script>
+      /**
+       * Scroll reveals. IntersectionObserver rather than CSS animation-timeline:
+       * scroll-driven animations are still behind a flag in Firefox stable, and
+       * the failure mode there would be permanently invisible content.
+       *
+       * Reveals once and stops observing — re-animating on scroll-up is the
+       * tell of a cheap effect.
+       */
+      function markStaggerGroups() {
+        document.querySelectorAll<HTMLElement>('[data-reveal-stagger]').forEach((group) => {
+          // Sections opt in from Page.astro, so a stagger group almost always
+          // sits inside one. Hold the cascade until that wrapper has mostly
+          // landed, otherwise both fades run at once and neither reads.
+          const nested = group.closest('[data-reveal]') !== null;
+          if (nested) group.style.setProperty('--reveal-offset', 'var(--p-motion-duration-slow)');
+
+          Array.from(group.children).forEach((child, i) => {
+            if (!(child instanceof HTMLElement)) return;
+            child.setAttribute('data-reveal', '');
+            child.style.setProperty('--reveal-i', String(i));
+          });
+        });
+      }
+
+      function revealNow(el: HTMLElement) {
+        el.classList.add('is-revealed');
+        // Images inside this section may have finished downloading long before
+        // the section itself scrolled into view — showImage() below withholds
+        // them until now, so release whichever are already loaded.
+        el.querySelectorAll<HTMLImageElement>('img').forEach(showImage);
+        // Lets a component's own script (e.g. StatsBar's count-up) react to
+        // its specific element revealing, without re-implementing the
+        // IntersectionObserver/stagger/reduced-motion handling above.
+        el.dispatchEvent(new CustomEvent('reveal', { bubbles: true }));
+      }
+
+      function initReveals() {
+        markStaggerGroups();
+
+        const targets = document.querySelectorAll<HTMLElement>('[data-reveal]:not(.is-revealed)');
+        if (!targets.length) return;
+
+        const noMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (noMotion || !('IntersectionObserver' in window)) {
+          targets.forEach(revealNow);
+          return;
+        }
+
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (!entry.isIntersecting || !(entry.target instanceof HTMLElement)) return;
+              revealNow(entry.target);
+              observer.unobserve(entry.target);
+            });
+          },
+          // Hold until the element is properly into the viewport. Triggering at
+          // the very edge means the animation is over before it's been looked at.
+          { rootMargin: '0px 0px -12% 0px', threshold: 0.05 },
+        );
+
+        targets.forEach((el) => observer.observe(el));
+      }
+
+      /**
+       * Reveals an image's blur-up crossfade — but only once its enclosing
+       * section has actually revealed. Without this gate, a cached or
+       * fast-loading image fires its 'load' event, and therefore its whole
+       * blur-to-sharp transition, while still hidden behind the section's own
+       * opacity:0 — so by the time you scroll to it, it's already sharp and the
+       * blur-up is invisible. Downloaded and on-screen are different moments;
+       * this only shows the image once both have happened.
+       */
+      function showImage(img: HTMLImageElement) {
+        if (img.dataset.loaded !== 'true') return;
+        const section = img.closest<HTMLElement>('[data-reveal]');
+        if (section && !section.classList.contains('is-revealed')) return;
+        img.classList.add('is-loaded');
+      }
+
+      /**
+       * Tracks decode state as data-loaded rather than revealing immediately, so
+       * revealNow() can release the image later if its section hasn't shown yet.
+       * Anything already complete (cached, or a repeat visit) is marked before
+       * paint so it never flashes.
+       */
+      function initImageFade() {
+        document.querySelectorAll<HTMLImageElement>('img:not([data-loaded])').forEach((img) => {
+          const mark = () => { img.dataset.loaded = 'true'; showImage(img); };
+          if (img.complete) { mark(); return; }
+          img.addEventListener('load', mark, { once: true });
+          // A broken image should still be visible rather than left at zero.
+          img.addEventListener('error', mark, { once: true });
+        });
+      }
+
+      /**
+       * A client-side navigation swaps the document without moving focus, so a
+       * keyboard user's position stays on the old page's link and the next Tab
+       * resumes from nowhere meaningful. Move focus to the top of the new
+       * content — astro:after-swap only fires on navigation, never first load,
+       * so this can't hijack focus on arrival.
+       */
+      document.addEventListener('astro:after-swap', () => {
+        const main = document.getElementById('main-content');
+        if (main) main.focus({ preventScroll: true });
+      });
+
+      // astro:page-load covers both first paint and ClientRouter navigations.
+      document.addEventListener('astro:page-load', initReveals);
+      document.addEventListener('astro:page-load', initImageFade);
+      // …but it never fires if the router is absent, so cover that too.
+      const start = () => { initReveals(); initImageFade(); };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start, { once: true });
+      } else {
+        start();
+      }
+    </script>
+  )}
+</body>
+</html>
+
+<style is:global>
+  /* Self-hosted — update per client (same file layout: drop the new family's
+     latin-subset variable woff2 into public/fonts/ and adjust the family
+     name/weight range below). Self-hosting instead of a fonts.googleapis.com
+     <link> removes a render-blocking cross-origin round-trip before first
+     paint — one same-origin request instead of a DNS+TLS negotiation to a
+     third-party domain. This is the same file Google's own CSS2 API serves
+     for this exact family/weight request — a single variable-font file
+     covering the whole 300-600 weight axis, not four separate static files. */
+  @font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 300 600;
+    font-display: swap;
+    src: url('/fonts/ibm-plex-sans-latin-variable.woff2') format('woff2');
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    font-size: 16px;
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* ---- page transitions ---------------------------------------------------
+     Keyframes for the animation defined in the frontmatter. The lift is small
+     on purpose: a few pixels reads as intentional, while a large travel starts
+     to feel like a slideshow and delays the content people came for. */
+  @keyframes primer-page-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  @keyframes primer-page-out {
+    from { opacity: 1; transform: none; }
+    to   { opacity: 0; transform: translateY(-6px); }
+  }
+
+  /* The snapshot pair is composited over the same ground, so paint the root
+     to stop the underlying page showing through mid-transition. */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    background: var(--p-color-bg-primary);
+  }
+
+  /* ---- scroll reveals ------------------------------------------------------
+     Hidden state is scoped to .has-reveal, which only exists once the inline
+     script runs — no script, no hiding. Elements opt in with [data-reveal];
+     a [data-reveal-stagger] container opts its children in as a cascade. */
+  /* No will-change here on purpose: it creates a containing block, which
+     interferes with position:sticky descendants (the case-study sidebar), and
+     the jank it would save on an opacity/transform pair is negligible. */
+  .has-reveal [data-reveal] {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  .has-reveal [data-reveal].is-revealed {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity   var(--p-motion-reveal) var(--p-motion-easing-ease-out),
+      transform var(--p-motion-reveal) var(--p-motion-easing-ease-out);
+    /*
+      --reveal-i is the child's position in a stagger group (0 elsewhere).
+      --reveal-offset holds a staggered group back until its section wrapper has
+      largely finished; without it the parent and children fade simultaneously,
+      their opacities multiply, and the cascade is lost in the mush.
+    */
+    transition-delay:
+      calc(var(--reveal-offset, 0ms) + var(--reveal-i, 0) * var(--p-motion-stagger));
+  }
+
+  /* Honour the OS setting: cut the motion, keep the swap instant rather than
+     leaving a half-faded frame. This covers the native path and Astro's
+     JS fallback, hence the broad selector. */
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+      animation: none !important;
+    }
+
+    .page-body { animation: none !important; }
+
+    .has-reveal [data-reveal] {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+
+  body {
+    font-family: var(--p-font-body);
+    font-weight: var(--p-font-weight-light);
+    background-color: var(--p-color-bg-primary);
+    color: var(--p-color-text-primary);
+    line-height: var(--p-font-leading-normal);
+  }
+
+  /* ---- typesetting --------------------------------------------------------
+     balance evens the line lengths of a headline instead of leaving one word
+     stranded on the last line; pretty does the narrower job of preventing
+     orphans in body copy. Both degrade to normal wrapping where unsupported. */
+  h1, h2, h3, h4, h5, h6 {
+    text-wrap: balance;
+  }
+
+  p, li, blockquote, figcaption, dd {
+    text-wrap: pretty;
+  }
+
+  /* Large display type is set tighter — tracking that reads as generous at
+     16px reads as loose at 64px. */
+  h1, h2 {
+    letter-spacing: var(--p-font-tracking-tight);
+  }
+
+  ::selection {
+    background: var(--p-color-accent-subtle);
+    color: var(--p-color-text-accent-strong);
+  }
+
+  /* ---- skip link ----------------------------------------------------------
+     Off-screen until focused rather than display:none, which would take it out
+     of the tab order entirely and defeat the point. */
+  .skip-link {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 999;
+    transform: translateY(-120%);
+    background: var(--p-color-bg-primary);
+    color: var(--p-color-text-accent-strong);
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-medium);
+    padding: var(--p-space-3) var(--p-space-5);
+    border: 1px solid var(--p-color-border-focus);
+    border-radius: 0 0 var(--p-radius-md) 0;
+    text-decoration: none;
+    transition: transform var(--p-motion-hover) var(--p-motion-ease);
+  }
+
+  .skip-link:focus {
+    transform: translateY(0);
+  }
+
+  /* The skip target is only focusable programmatically, so it should never
+     draw a ring of its own when focus lands there. */
+  #main-content:focus {
+    outline: none;
+  }
+
+  /* ---- image loading ------------------------------------------------------
+     Images resolve in rather than popping. Scoped to .has-reveal so a failed
+     script can never leave them permanently transparent, and images already in
+     cache are marked loaded before paint so there's no flash on repeat visits. */
+  .has-reveal img {
+    opacity: 0;
+    transition: opacity var(--p-motion-duration-slow) var(--p-motion-easing-ease-out);
+  }
+
+  .has-reveal img.is-loaded {
+    opacity: 1;
+  }
+
+  /* Media wrappers hold a blurred thumbnail behind the real file, so large
+     images fade from a soft impression of themselves rather than from nothing. */
+  [data-blur-up] {
+    background-size: cover;
+    background-position: center;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .has-reveal img { opacity: 1; transition: none; }
+  }
+
+  /* ---- link underline -----------------------------------------------------
+     A gradient underline grown from the left, rather than a colour swap. Sized
+     in em so it tracks the type it belongs to. */
+  .prose-link,
+  .rich-text__inner :global(a),
+  .case-study__body :global(a) {
+    text-decoration: none;
+    background-image: linear-gradient(currentColor, currentColor);
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0% 1px;
+    transition: background-size var(--p-motion-duration-slow) var(--p-motion-easing-ease-out);
+    padding-bottom: 0.08em;
+  }
+
+  .prose-link:hover,
+  .rich-text__inner :global(a:hover),
+  .case-study__body :global(a:hover) {
+    background-size: 100% 1px;
+  }
+
+  /* Keyboard users get the underline too — hover isn't available to them. */
+  .prose-link:focus-visible,
+  .rich-text__inner :global(a:focus-visible),
+  .case-study__body :global(a:focus-visible) {
+    background-size: 100% 1px;
+  }
+
+  /* ---- focus --------------------------------------------------------------
+     :focus-visible only, so pointer users never see a ring but keyboard users
+     always do. Two-tone: the accent ring plus a background-coloured gap, so it
+     stays legible on any surface the ring lands on. */
+  :focus-visible {
+    outline: 2px solid var(--p-color-border-focus);
+    outline-offset: 2px;
+    border-radius: var(--p-radius-xs);
+  }
+
+  /* Clicking a heading anchor shouldn't leave the target under a sticky header. */
+  :target {
+    scroll-margin-top: var(--p-space-16);
+  }
+
+  img, video {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  a { color: inherit; }
+</style>

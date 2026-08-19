@@ -1,0 +1,122 @@
+---
+import { useStoryblokApi, getPayload } from '@storyblok/astro';
+import type { SbBlokData, ISbStoryData } from '@storyblok/astro';
+import StoryblokComponent from '@storyblok/astro/StoryblokComponent.astro';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { article, parseCustomSchema, type SchemaNode } from '../lib/schema';
+import { isPageStory } from '../lib/storyblok-payload';
+import { deriveFallbackDescription, deriveFallbackImage } from '../lib/seo-fallback';
+
+interface Metatags {
+  title?: string;
+  description?: string;
+  og_image?: string;
+}
+
+interface SeoBlock extends SbBlokData {
+  metatags?: Metatags;
+  canonical_url?: string;
+  noindex?: boolean;
+}
+
+interface Story extends ISbStoryData<SbBlokData & {
+  seo?: SeoBlock[];
+  hide_nav?: boolean;
+  hide_footer?: boolean;
+}> {}
+
+const slug = Astro.params.slug || '';
+
+// "config" and "home" are internal/special stories, not real routes —
+// config holds header/footer (fetched separately by BaseLayout), home is
+// served by index.astro.
+if (slug === 'config' || slug === 'home') {
+  return Astro.rewrite('/404');
+}
+
+const payload = await getPayload<object, Story>({ locals: Astro.locals });
+let story: Story | undefined = payload?.story;
+
+// A live-preview payload can be a non-page singleton (e.g. `config`, opened
+// directly in the Visual Editor) — discard it and fetch the story for this
+// URL's own slug instead of trying to render it as one.
+if (!isPageStory(story)) story = undefined;
+
+if (!story) {
+  const api = useStoryblokApi();
+  try {
+    // resolve_relations inlines testimonials.items' referenced testimonial
+    // stories in this one request — see TestimonialBlock.astro. The
+    // live-preview payload path above doesn't get this param (Storyblok's
+    // bridge doesn't apply it), which is why that component also resolves
+    // defensively on its own.
+    const { data } = await api.get(`cdn/stories/${slug}`, {
+      version: 'draft',
+      resolve_relations: 'testimonials.items',
+    });
+    story = data.story;
+  } catch (e) {
+    return Astro.rewrite('/404');
+  }
+}
+
+if (!story) {
+  return Astro.rewrite('/404');
+}
+
+const seo = story.content.seo?.[0];
+const metatags = seo?.metatags;
+
+// A page with no seo block filled in shouldn't ship an empty <meta
+// name="description">/og:image — fall back to whatever the page's own
+// body content actually says, same spirit as the title fallback below.
+const body = Array.isArray((story.content as { body?: unknown }).body)
+  ? ((story.content as { body?: unknown[] }).body as Record<string, unknown>[])
+  : undefined;
+const description = metatags?.description || deriveFallbackDescription(body);
+const ogImage = metatags?.og_image || deriveFallbackImage(body);
+
+/**
+ * Structured data for this page, merged into the site-wide graph in BaseLayout.
+ *
+ * Only `resource` entries become an Article — a marketing or campaign page isn't
+ * an article, and claiming otherwise is the kind of thing that gets structured
+ * data ignored wholesale rather than rewarded.
+ */
+const origin = Astro.site?.origin ?? Astro.url.origin;
+const pageUrl = `${origin}${Astro.url.pathname}`;
+
+const schemaNodes = [
+  story.content.component === 'resource'
+    ? article({
+        origin,
+        url: pageUrl,
+        headline: String(story.content.title || story.name),
+        description,
+        image: ogImage,
+        // first_published_at is when it went live; published_at moves on each
+        // republish, which is exactly what dateModified should track.
+        datePublished: story.first_published_at ?? undefined,
+        dateModified: story.published_at ?? undefined,
+        resourceType: String(story.content.resource_type ?? ''),
+      })
+    : null,
+  // Editor-supplied JSON-LD for anything the system doesn't model.
+  parseCustomSchema(typeof seo?.custom_schema === 'string' ? seo.custom_schema : undefined),
+]
+  .flatMap((n) => (Array.isArray(n) ? n : [n]))
+  .filter((n): n is SchemaNode => Boolean(n));
+---
+
+<BaseLayout
+  title={metatags?.title || story.name}
+  description={description}
+  ogImage={ogImage}
+  noIndex={seo?.noindex}
+  canonicalUrl={seo?.canonical_url}
+  hideNav={story.content.hide_nav}
+  hideFooter={story.content.hide_footer}
+  schemaNodes={schemaNodes}
+>
+  <StoryblokComponent blok={story.content} />
+</BaseLayout>

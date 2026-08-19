@@ -1,0 +1,39 @@
+---
+import { useStoryblokApi, getPayload } from '@storyblok/astro';
+import StoryblokComponent from '@storyblok/astro/StoryblokComponent.astro';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { isPageStory } from '../lib/storyblok-payload';
+import { deriveFallbackDescription, deriveFallbackImage } from '../lib/seo-fallback';
+
+const payload = await getPayload({ locals: Astro.locals });
+let story = payload?.story;
+
+// A live-preview payload can be a non-page singleton (e.g. `config`, opened
+// directly in the Visual Editor) — discard it and fetch the real page
+// instead of trying to render it as one. See src/lib/storyblok-payload.ts.
+if (!isPageStory(story)) story = undefined;
+
+if (!story) {
+  const api = useStoryblokApi();
+  // resolve_relations inlines testimonials.items' referenced testimonial
+  // stories in this one request — see TestimonialBlock.astro.
+  const { data } = await api.get('cdn/stories/home', {
+    version: 'draft',
+    resolve_relations: 'testimonials.items',
+  });
+  story = data.story;
+}
+
+if (!story) {
+  return Astro.rewrite('/404');
+}
+
+const content = story.content as { seo?: Array<{ metatags?: { title?: string; description?: string; og_image?: string } }>; body?: Record<string, unknown>[] };
+const metatags = content.seo?.[0]?.metatags;
+const description = metatags?.description || deriveFallbackDescription(content.body);
+const ogImage = metatags?.og_image || deriveFallbackImage(content.body);
+---
+
+<BaseLayout title={metatags?.title || story.name} description={description} ogImage={ogImage}>
+  <StoryblokComponent blok={story.content} />
+</BaseLayout>
