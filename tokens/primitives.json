@@ -8,28 +8,28 @@
         "value": "#fafaf8"
       },
       "100": {
-        "value": "#f5f3ef"
+        "value": "#dfdfe0"
       },
       "200": {
-        "value": "#e2ddd8"
+        "value": "#cacacb"
       },
       "300": {
-        "value": "#c8c4be"
+        "value": "#b4b5b6"
       },
       "400": {
-        "value": "#9c9893"
+        "value": "#9fa0a1"
       },
       "500": {
-        "value": "#706d68"
+        "value": "#8a8a8c"
       },
       "600": {
-        "value": "#524f4b"
+        "value": "#757577"
       },
       "700": {
-        "value": "#2c2c2a"
+        "value": "#606063"
       },
       "800": {
-        "value": "#1c1c1a"
+        "value": "#4a4b4d"
       },
       "900": {
         "value": "#111111"
@@ -40,61 +40,61 @@
         "value": "#fbf3e8"
       },
       "200": {
-        "value": "#f0d9b0"
+        "value": "{color.neutral.200}"
       },
       "300": {
-        "value": "#d4a85a"
+        "value": "{color.neutral.300}"
       },
       "400": {
-        "value": "#c99843"
+        "value": "{color.neutral.400}"
       },
       "500": {
-        "value": "#bf8b3c"
+        "value": "{color.neutral.500}"
       },
       "600": {
-        "value": "#a37030"
+        "value": "{color.neutral.600}"
       },
       "700": {
-        "value": "#8a5a0e"
+        "value": "{color.neutral.700}"
       },
       "900": {
-        "value": "#4a2f06"
+        "value": "{color.neutral.900}"
       }
     },
     "success": {
       "bg": {
-        "value": "#ebf5ee"
+        "value": "#e3ecb7"
       },
       "subtle": {
         "value": "#C3E2CB"
       },
       "base": {
-        "value": "#1a6644"
+        "value": "#7a8738"
       },
       "dark": {
-        "value": "#0f4429"
+        "value": "#525a27"
       }
     },
     "warning": {
       "bg": {
-        "value": "#fdf0d8"
+        "value": "#f4d698"
       },
       "subtle": {
         "value": "#F9D99A"
       },
       "base": {
-        "value": "#8a5a0e"
+        "value": "#b88827"
       }
     },
     "danger": {
       "bg": {
-        "value": "#f5ecec"
+        "value": "#ebaaaa"
       },
       "subtle": {
         "value": "#E8C4C4"
       },
       "base": {
-        "value": "#a83838"
+        "value": "#873838"
       },
       "dark": {
         "value": "#7A2020"
