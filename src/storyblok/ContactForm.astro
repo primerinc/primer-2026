@@ -255,13 +255,19 @@ const useHubspot       = !!(hubspotPortalId && hubspotFormId);
           if (!res.ok) throw new Error(`HubSpot ${res.status}`);
         } else {
           // ── Netlify Forms fallback ─────────────────────────────
+          // Posting to '/' would hit this SSR site's own Astro function,
+          // which just re-renders the page and swallows the submission —
+          // Netlify's form-processing layer never sees it. Posting to the
+          // static stub page instead (public/__forms.html, not routed
+          // through the SSR function) lets Netlify actually intercept it.
           const params = new URLSearchParams();
           new FormData(f).forEach((val, key) => params.append(key, String(val)));
-          await fetch('/', {
+          const res = await fetch('/__forms.html', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: params.toString(),
           });
+          if (!res.ok) throw new Error(`Netlify Forms ${res.status}`);
         }
 
         const wrap    = f.closest('.contact__form-wrap');
