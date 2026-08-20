@@ -379,6 +379,15 @@ const announcementHref  = blok.announcement_link_url?.url || blok.announcement_l
     setMenu(hamburger.getAttribute('aria-expanded') !== 'true');
   });
 
+  // Any actual link inside the mobile menu (top-level, dropdown, login, CTA)
+  // should close the overlay — otherwise a same-page anchor link (#section)
+  // never navigates away, so nothing ever calls setMenu(false): body stays
+  // overflow:hidden and main-content/site-footer stay inert, leaving the
+  // page fully unclickable behind the still-open overlay.
+  mobileNav?.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement)?.closest('a')) setMenu(false);
+  });
+
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (hamburger?.getAttribute('aria-expanded') === 'true') setMenu(false);
@@ -439,7 +448,7 @@ const announcementHref  = blok.announcement_link_url?.url || blok.announcement_l
   /* ── Site Header ────────────────────────────────────────────── */
   .site-header {
     background: var(--p-color-bg-primary);
-    padding: 0 var(--p-space-6);
+    padding: var(--p-space-3) var(--p-space-6);
     position: relative;
     z-index: 100;
   }
