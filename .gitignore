@@ -164,3 +164,6 @@ Thumbs.db
 
 # Local scratch/debug screenshots
 .scratch_*
+
+# Local Netlify folder
+.netlify

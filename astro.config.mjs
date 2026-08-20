@@ -1,6 +1,6 @@
 import { defineConfig } from 'astro/config';
 import { storyblok } from '@storyblok/astro';
-import cloudflare from '@astrojs/cloudflare';
+import netlify from '@astrojs/netlify';
 import mkcert from 'vite-plugin-mkcert';
 import { loadEnv } from 'vite';
 
@@ -28,7 +28,7 @@ const watchTokens = {
 
 export default defineConfig({
   output: 'server',
-  adapter: cloudflare(),
+  adapter: netlify(),
   integrations: [
     storyblok({
       accessToken: env.STORYBLOK_TOKEN,
