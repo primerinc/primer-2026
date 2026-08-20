@@ -4,7 +4,7 @@
  * Storyblok block name: gallery
  *
  * Fields: eyebrow, headline, body, images (blocks → gallery_item: image, alt),
- * layout (masonry | grid), columns, background, anchor_id
+ * layout (masonry | grid), columns, background, anchor_id, lightbox_enabled
  *
  * layout=masonry keeps each image's natural aspect ratio and packs them into
  * a CSS multi-column layout (Pinterest-style, varying tile heights).
@@ -22,10 +22,12 @@ interface GalleryItem extends SbBlokData {
 
 const { blok } = Astro.props;
 
-const layout  = blok.layout || 'masonry';
-const columns = blok.columns || 3;
-const bg      = blok.background || 'primary';
+const layout    = blok.layout || 'masonry';
+const columns   = blok.columns || 3;
+const bg        = blok.background || 'primary';
+const lightbox  = blok.lightbox_enabled ?? false;
 const images: GalleryItem[] = blok.images ?? [];
+const uid = `gallery-${blok._uid}`;
 ---
 
 <section
@@ -43,36 +45,142 @@ const images: GalleryItem[] = blok.images ?? [];
     )}
 
     <div class:list={['gallery__grid', `gallery__grid--${columns}`]} data-reveal-stagger>
-      {images.map((item) => {
+      {images.map((item, i) => {
         const imageUrl = item.image?.filename;
         if (!imageUrl) return null;
         const alt = item.alt || item.image?.alt || '';
+        const fullUrl = `${imageUrl}/m/1600x0/filters:quality(85)`;
 
-        return layout === 'grid' ? (
-          <div class="gallery__tile" {...storyblokEditable(item)}>
-            <img
-              {...imageSize(imageUrl, 800, 800)}
-              src={`${imageUrl}/m/800x800/filters:quality(85)`}
-              alt={alt}
-              class="gallery__img"
-              loading="lazy"
-            />
-          </div>
+        const img = layout === 'grid' ? (
+          <img
+            {...imageSize(imageUrl, 800, 800)}
+            src={`${imageUrl}/m/800x800/filters:quality(85)`}
+            alt={alt}
+            class="gallery__img"
+            loading="lazy"
+          />
+        ) : (
+          <img
+            {...imageSize(imageUrl, 800, 0)}
+            src={`${imageUrl}/m/800x0/filters:quality(85)`}
+            alt={alt}
+            class="gallery__img"
+            loading="lazy"
+          />
+        );
+
+        return lightbox ? (
+          <button
+            type="button"
+            class="gallery__tile gallery__tile--button"
+            {...storyblokEditable(item)}
+            data-lightbox-trigger
+            data-index={i}
+            data-full={fullUrl}
+            data-alt={alt}
+            aria-label={`Open image ${i + 1} of ${images.length}${alt ? `: ${alt}` : ''}`}
+          >
+            {img}
+          </button>
         ) : (
           <div class="gallery__tile" {...storyblokEditable(item)}>
-            <img
-              {...imageSize(imageUrl, 800, 0)}
-              src={`${imageUrl}/m/800x0/filters:quality(85)`}
-              alt={alt}
-              class="gallery__img"
-              loading="lazy"
-            />
+            {img}
           </div>
         );
       })}
     </div>
   </div>
+
+  {lightbox && (
+    <div class="gallery__lightbox" data-lightbox-root id={uid} hidden>
+      <div class="gallery__lightbox-backdrop" data-lightbox-close></div>
+      <div class="gallery__lightbox-dialog" role="dialog" aria-modal="true" aria-label="Image viewer">
+        <button type="button" class="gallery__lightbox-close" data-lightbox-close aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 4L16 16M16 4L4 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <button type="button" class="gallery__lightbox-nav gallery__lightbox-nav--prev" data-lightbox-prev aria-label="Previous image">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <img class="gallery__lightbox-img" data-lightbox-img src="" alt="" />
+        <button type="button" class="gallery__lightbox-nav gallery__lightbox-nav--next" data-lightbox-next aria-label="Next image">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <p class="gallery__lightbox-count" data-lightbox-count aria-live="polite"></p>
+      </div>
+    </div>
+  )}
 </section>
+
+{lightbox && (
+  <script define:vars={{ uid }}>
+    (function () {
+      const root = document.getElementById(uid);
+      if (!root) return;
+      const section = root.closest('.gallery');
+      const triggers = Array.from(section.querySelectorAll('[data-lightbox-trigger]'));
+      if (!triggers.length) return;
+
+      const img = root.querySelector('[data-lightbox-img]');
+      const count = root.querySelector('[data-lightbox-count]');
+      const closeEls = root.querySelectorAll('[data-lightbox-close]');
+      const prevBtn = root.querySelector('[data-lightbox-prev]');
+      const nextBtn = root.querySelector('[data-lightbox-next]');
+
+      let currentIndex = 0;
+      let triggerEl = null;
+
+      function show(index) {
+        currentIndex = (index + triggers.length) % triggers.length;
+        const t = triggers[currentIndex];
+        img.src = t.dataset.full;
+        img.alt = t.dataset.alt || '';
+        count.textContent = `${currentIndex + 1} / ${triggers.length}`;
+      }
+
+      function open(index, fromEl) {
+        triggerEl = fromEl;
+        show(index);
+        root.hidden = false;
+        document.body.style.overflow = 'hidden';
+        root.querySelector('.gallery__lightbox-close').focus();
+        document.addEventListener('keydown', onKeydown);
+      }
+
+      function close() {
+        root.hidden = true;
+        document.body.style.overflow = '';
+        document.removeEventListener('keydown', onKeydown);
+        if (triggerEl) triggerEl.focus();
+      }
+
+      function onKeydown(e) {
+        if (e.key === 'Escape') close();
+        else if (e.key === 'ArrowLeft') show(currentIndex - 1);
+        else if (e.key === 'ArrowRight') show(currentIndex + 1);
+        else if (e.key === 'Tab') {
+          // Simple focus trap across the dialog's few focusable controls.
+          const focusable = root.querySelectorAll('button');
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+
+      triggers.forEach((t, i) => {
+        t.addEventListener('click', () => open(i, t));
+      });
+      closeEls.forEach((el) => el.addEventListener('click', close));
+      prevBtn.addEventListener('click', () => show(currentIndex - 1));
+      nextBtn.addEventListener('click', () => show(currentIndex + 1));
+    })();
+  </script>
+)}
 
 <style>
   .gallery {
@@ -188,5 +296,104 @@ const images: GalleryItem[] = blok.images ?? [];
     .gallery--grid .gallery__grid--4 {
       grid-template-columns: 1fr;
     }
+  }
+
+  /* ── Lightbox trigger — reset button chrome so it looks like the plain tile ── */
+  .gallery__tile--button {
+    display: block;
+    width: 100%;
+    padding: 0;
+    background: none;
+    border: none;
+    font: inherit;
+    cursor: zoom-in;
+    text-align: left;
+  }
+
+  .gallery__tile--button:focus-visible {
+    outline: var(--p-border-width-md) solid var(--p-color-accent-default);
+    outline-offset: var(--p-space-1);
+  }
+
+  /* ── Lightbox modal ── */
+  .gallery__lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .gallery__lightbox[hidden] { display: none; }
+
+  .gallery__lightbox-backdrop {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--p-color-bg-inverse) 92%, transparent);
+  }
+
+  .gallery__lightbox-dialog {
+    position: relative;
+    width: min(90vw, 75rem);
+    max-height: 90vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .gallery__lightbox-img {
+    max-width: 100%;
+    max-height: 85vh;
+    width: auto;
+    height: auto;
+    display: block;
+    border-radius: var(--p-radius-md);
+  }
+
+  .gallery__lightbox-close {
+    position: absolute;
+    top: calc(-1 * var(--p-space-12));
+    right: 0;
+    background: none;
+    border: none;
+    color: var(--p-color-text-on-dark);
+    cursor: pointer;
+    padding: var(--p-space-2);
+  }
+
+  .gallery__lightbox-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: color-mix(in srgb, var(--p-color-bg-inverse) 60%, transparent);
+    border: none;
+    border-radius: var(--p-radius-full);
+    color: var(--p-color-text-on-dark);
+    width: var(--p-space-12);
+    height: var(--p-space-12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .gallery__lightbox-nav--prev { left: calc(-1 * var(--p-space-6)); }
+  .gallery__lightbox-nav--next { right: calc(-1 * var(--p-space-6)); }
+
+  .gallery__lightbox-count {
+    position: absolute;
+    bottom: calc(-1 * var(--p-space-10));
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--p-color-text-on-dark);
+    font-size: var(--p-font-size-sm);
+    margin: 0;
+  }
+
+  @media (max-width: 640px) {
+    .gallery__lightbox-nav--prev { left: var(--p-space-2); }
+    .gallery__lightbox-nav--next { right: var(--p-space-2); }
+    .gallery__lightbox-close { top: var(--p-space-2); right: var(--p-space-2); }
   }
 </style>

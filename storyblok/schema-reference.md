@@ -132,7 +132,7 @@ Legacy nested-block shape, superseded by the `testimonial` content type above. S
 
 ## gallery
 
-Headline + paragraph above a grid of images. Two layout modes: `masonry` (default — each image keeps its natural aspect ratio, packed via a CSS multi-column layout, so tile heights vary) and `grid` (every tile cropped to a uniform 1:1 square via `object-fit: cover`, so the grid reads as even rows/columns). No lightbox — images are static, not click-to-enlarge.
+Headline + paragraph above a grid of images. Two layout modes: `masonry` (default — each image keeps its natural aspect ratio, packed via a CSS multi-column layout, so tile heights vary) and `grid` (every tile cropped to a uniform 1:1 square via `object-fit: cover`, so the grid reads as even rows/columns). Lightbox is opt-in per instance (see `lightbox_enabled`) — off by default, images stay static/non-clickable unless turned on.
 
 | Field name | Type     | Required | Options / Notes                                             |
 |------------|----------|----------|-----------------------------------------------------------------|
@@ -144,6 +144,7 @@ Headline + paragraph above a grid of images. Two layout modes: `masonry` (defaul
 | columns    | Option   | No       | 2, 3 (default), 4                                                 |
 | background | Option   | No       | primary (default), secondary, accent-subtle                      |
 | anchor_id  | Text     | No       | Optional in-page anchor slug (e.g. "craft") for single-page nav links (`#craft`) to jump to. Added 2026-08-19 |
+| lightbox_enabled | Boolean | No | Default false. When true, tiles become clickable and open a full-screen modal viewer with prev/next nav, Escape/click-outside/arrow-key support, and focus trapping. Vanilla JS, scoped per-instance so multiple Galleries on one page don't collide. Added 2026-08-20 |
 
 ### gallery_item (nested block inside gallery)
 
