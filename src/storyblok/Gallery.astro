@@ -4,7 +4,7 @@
  * Storyblok block name: gallery
  *
  * Fields: eyebrow, headline, body, images (blocks → gallery_item: image, alt),
- * layout (masonry | grid), columns, background
+ * layout (masonry | grid), columns, background, anchor_id
  *
  * layout=masonry keeps each image's natural aspect ratio and packs them into
  * a CSS multi-column layout (Pinterest-style, varying tile heights).
@@ -30,6 +30,7 @@ const images: GalleryItem[] = blok.images ?? [];
 
 <section
   {...storyblokEditable(blok)}
+  id={blok.anchor_id || undefined}
   class:list={['gallery', `gallery--${layout}`, `gallery--bg-${bg}`]}
 >
   <div class="gallery__inner">

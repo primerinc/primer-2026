@@ -319,6 +319,30 @@ const siteSchema = siteName
       }
     </script>
   )}
+
+  <script>
+    /**
+     * Native <a href="#id"> navigation only scrolls when the URL hash
+     * actually changes. Clicking a nav link back to a section you're
+     * already anchored on (e.g. scrolled back to the top with #about
+     * still in the address bar) is a no-op in the browser by default —
+     * intercept the click and always scroll, regardless of whether the
+     * hash is changing.
+     */
+    document.addEventListener('click', (e) => {
+      const link = (e.target as HTMLElement)?.closest?.('a[href^="#"]') as HTMLAnchorElement | null;
+      if (!link) return;
+      const id = link.getAttribute('href')?.slice(1);
+      if (!id) return;
+      const target = document.getElementById(id);
+      if (!target) return;
+
+      e.preventDefault();
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+      if (history.pushState) history.pushState(null, '', `#${id}`);
+    });
+  </script>
 </body>
 </html>
 
@@ -349,6 +373,13 @@ const siteSchema = siteName
     font-size: 16px;
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+  }
+
+  /* Any in-page anchor target (single-page nav sections via a component's
+     optional anchor_id field) needs room for the sticky header so the jump
+     doesn't land the section title underneath it. */
+  [id] {
+    scroll-margin-top: 6rem;
   }
 
   /* ---- page transitions ---------------------------------------------------

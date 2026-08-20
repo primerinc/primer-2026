@@ -11,6 +11,7 @@ Copy each schema exactly — field names must match the prop interfaces in the A
 
 | Field name           | Type     | Required | Options / Notes              |
 |----------------------|----------|----------|------------------------------|
+| eyebrow              | Text     | No       | Small label above the headline (added 2026-08-19) |
 | headline             | Text     | Yes      |                              |
 | subheadline          | Textarea | No       |                              |
 | buttons              | Blocks   | No       | Restrict to: button, max 2 — replaced the old cta_primary_label/cta_primary_url/cta_secondary_label/cta_secondary_url text fields |
@@ -34,6 +35,8 @@ Copy each schema exactly — field names must match the prop interfaces in the A
 | columns      | Option  | No       | 2, 3 (default), 4            |
 | text_align   | Option  | No       | center (default), left       |
 | background   | Option  | No       | primary (default), secondary, accent-subtle, dark |
+| item_style   | Option  | No       | card (default — bordered/backgrounded card, existing look), flat (no background/border/padding — plain title+description for content that doesn't need per-item visual separation, e.g. a sequential-process-style grid with no icons). Added 2026-08-19 |
+| anchor_id    | Text    | No       | Optional in-page anchor slug for single-page nav links to jump to. Added 2026-08-19 |
 
 ### feature_item (nested block inside feature_grid)
 
@@ -114,6 +117,8 @@ Legacy nested-block shape, superseded by the `testimonial` content type above. S
 | eyebrow    | Text   | No       | e.g. "Trusted by"           |
 | logos      | Blocks | Yes      | Restrict to: logo_item      |
 | display    | Option | No       | grid (default), marquee     |
+| background | Option | No       | secondary (default — matches original hardcoded background), primary, accent-subtle. Added 2026-08-19 |
+| show_border | Boolean | No      | Default true (top+bottom border, original hardcoded look). Added 2026-08-19 |
 
 ### logo_item
 
@@ -138,6 +143,7 @@ Headline + paragraph above a grid of images. Two layout modes: `masonry` (defaul
 | layout     | Option   | No       | masonry (default), grid                                          |
 | columns    | Option   | No       | 2, 3 (default), 4                                                 |
 | background | Option   | No       | primary (default), secondary, accent-subtle                      |
+| anchor_id  | Text     | No       | Optional in-page anchor slug (e.g. "craft") for single-page nav links (`#craft`) to jump to. Added 2026-08-19 |
 
 ### gallery_item (nested block inside gallery)
 
@@ -159,6 +165,7 @@ Headline + paragraph above a grid of images. Two layout modes: `masonry` (defaul
 | image       | Asset    | No       | Image only                   |
 | image_side  | Option   | No       | right (default), left        |
 | background  | Option   | No       | primary (default), secondary, accent-subtle, dark |
+| anchor_id   | Text     | No       | Optional in-page anchor slug for single-page nav links to jump to. Added 2026-08-19 |
 
 ---
 
@@ -229,6 +236,7 @@ Headline + paragraph above a grid of images. Two layout modes: `masonry` (defaul
 | login_link                | Link    | No       | Multilink                              |
 | cta_button                | Blocks  | No       | Restrict to: button. Maximum: 1        |
 | sticky                    | Boolean | No       | Default true                           |
+| show_border               | Boolean | No       | Default true (bottom border under the header, original hardcoded look). Added 2026-08-19 |
 
 ### nav_item (nested block inside header)
 
@@ -273,7 +281,7 @@ Headline + paragraph above a grid of images. Two layout modes: `masonry` (defaul
 | Field name          | Type    | Required | Options / Notes                         |
 |---------------------|---------|----------|-----------------------------------------|
 | logo                | Asset   | No       | Image only                              |
-| tagline             | Text    | No       | Short line under logo                   |
+| tagline             | Text    | No       | Short line beside the logo — sits in a single row with the logo and social icons (not stacked below) when there are no footer columns/newsletter; wraps into a normal top-column layout once columns/newsletter are present. Row behavior added 2026-08-19 |
 | columns             | Blocks  | No       | Restrict to: footer_column              |
 | social_links        | Blocks  | No       | Restrict to: social_link                |
 | newsletter_enabled  | Boolean | No       | Default false                           |
@@ -331,6 +339,7 @@ Headline + paragraph above a grid of images. Two layout modes: `masonry` (defaul
 | items       | Blocks   | Yes      | Restrict to: tab_item                  |
 | layout      | Option   | No       | horizontal (default), vertical         |
 | background  | Option   | No       | primary (default), secondary, accent-subtle, dark |
+| anchor_id   | Text     | No       | Optional in-page anchor slug for single-page nav links to jump to. Added 2026-08-19 |
 
 ### tab_item (nested block inside tabs)
 
@@ -421,6 +430,7 @@ Headline + paragraph above a grid of images. Two layout modes: `masonry` (defaul
 | hubspot_portal_id  | Text     | No       | HubSpot portal ID (e.g. 12345678). Set both HS fields to enable HubSpot API mode |
 | hubspot_form_id    | Text     | No       | HubSpot form GUID — found in HubSpot → Marketing → Forms → share → Embed Code |
 | background         | Option   | No       | primary (default), secondary, accent-subtle               |
+| anchor_id          | Text     | No       | Optional in-page anchor slug for single-page nav links to jump to. Added 2026-08-19 |
 
 **HubSpot mode:** When both `hubspot_portal_id` and `hubspot_form_id` are set, submissions POST to the HubSpot Forms v3 API (CORS-safe, no embed script). Full name splits into `firstname`/`lastname` at the first space. HubSpot property names used: `firstname`, `lastname`, `email`, `message`, `phone`, `company`. Falls back to Netlify Forms when either field is blank.
 
@@ -463,6 +473,7 @@ Headline + paragraph above a grid of images. Two layout modes: `masonry` (defaul
 | steps        | Blocks   | Yes      | Restrict to: process_step                           |
 | layout       | Option   | No       | horizontal (default), vertical                      |
 | background   | Option   | No       | primary (default), secondary, accent-subtle         |
+| anchor_id    | Text     | No       | Optional in-page anchor slug for single-page nav links to jump to. Added 2026-08-19 |
 
 ### process_step (nested block inside process_steps)
 

@@ -6,7 +6,7 @@
  * Fields: eyebrow, headline, subheadline, layout, show_phone, show_company,
  *         contact_email, contact_phone, contact_address,
  *         submit_label, success_message, background,
- *         hubspot_portal_id, hubspot_form_id
+ *         hubspot_portal_id, hubspot_form_id, anchor_id
  *
  * HubSpot is the default/expected form backend as of 2026-08-14 — every
  * Lock 8 client stays in the HubSpot ecosystem for form management unless
@@ -36,7 +36,7 @@ const hubspotFormId    = blok.hubspot_form_id   || '';
 const useHubspot       = !!(hubspotPortalId && hubspotFormId);
 ---
 
-<section {...storyblokEditable(blok)} class:list={['contact', `contact--${layout}`, `contact--bg-${bg}`]}>
+<section {...storyblokEditable(blok)} id={blok.anchor_id || undefined} class:list={['contact', `contact--${layout}`, `contact--bg-${bg}`]}>
   <div class="contact__inner">
 
     {layout === 'split' && (

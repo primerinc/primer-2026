@@ -3,7 +3,7 @@
  * TwoColumn
  * Storyblok block name: two_column
  *
- * Fields: eyebrow, headline, body, cta_button (Blocks → button, max 1), image, image_side
+ * Fields: eyebrow, headline, body, cta_button (Blocks → button, max 1), image, image_side, anchor_id
  */
 import { storyblokEditable } from '@storyblok/astro';
 import { imageSize } from '../lib/storyblok-image';
@@ -24,6 +24,7 @@ const ctaHref = cta?.link?.url || cta?.link?.cached_url;
 
 <section
   {...storyblokEditable(blok)}
+  id={blok.anchor_id || undefined}
   class:list={['two-col', `two-col--image-${imageSide}`, `two-col--bg-${bg}`]}
 >
   <div class="two-col__inner">

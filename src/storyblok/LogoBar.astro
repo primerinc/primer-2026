@@ -3,7 +3,7 @@
  * LogoBar
  * Storyblok block name: logo_bar
  *
- * Fields: eyebrow, logos (blocks → logo_item: image, alt, url), display
+ * Fields: eyebrow, logos (blocks → logo_item: image, alt, url), display, background, show_border
  */
 import { storyblokEditable } from '@storyblok/astro';
 import { imageSize } from '../lib/storyblok-image';
@@ -18,6 +18,8 @@ interface LogoItem {
 const { blok } = Astro.props;
 
 const isMarquee = (blok.display ?? 'grid') === 'marquee';
+const bg = blok.background || 'secondary';
+const showBorder = blok.show_border ?? true;
 const logos: LogoItem[] = blok.logos ?? [];
 
 // A single duplication (2x) only fills the animated band if the logo set is
@@ -45,7 +47,7 @@ function imgSrc(logo: LogoItem) {
 }
 ---
 
-<section {...storyblokEditable(blok)} class:list={['logo-bar', isMarquee && 'logo-bar--marquee']}>
+<section {...storyblokEditable(blok)} class:list={['logo-bar', isMarquee && 'logo-bar--marquee', `logo-bar--bg-${bg}`, showBorder && 'logo-bar--border']}>
   {blok.eyebrow && <p class="logo-bar__eyebrow">{blok.eyebrow}</p>}
 
   {isMarquee && (
@@ -91,9 +93,15 @@ function imgSrc(logo: LogoItem) {
   .logo-bar {
     padding: var(--p-space-16) var(--p-space-8);
     background: var(--p-color-bg-secondary);
+  }
+
+  .logo-bar--border {
     border-top: var(--p-border-width-default) solid var(--p-color-border-subtle);
     border-bottom: var(--p-border-width-default) solid var(--p-color-border-subtle);
   }
+
+  .logo-bar--bg-primary       { background: var(--p-color-bg-primary); }
+  .logo-bar--bg-accent-subtle { background: var(--p-color-bg-accent); }
 
   .logo-bar__eyebrow {
     font-size: var(--p-font-size-xs);

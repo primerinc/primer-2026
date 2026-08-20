@@ -5,7 +5,7 @@
  *
  * Fields: announcement_enabled, announcement_text, announcement_link_label,
  *         announcement_link_url, logo, nav_items (→ nav_item), login_enabled,
- *         login_label, login_link, cta_button (→ button, max 1), sticky
+ *         login_label, login_link, cta_button (→ button, max 1), sticky, show_border
  *
  * nav_item fields: label, link, dropdown_groups (→ nav_group),
  *                  featured_panel (→ nav_featured_panel, max 1)
@@ -26,6 +26,7 @@ import { imageSize } from '../lib/storyblok-image';
 const { blok } = Astro.props;
 
 const sticky            = blok.sticky ?? true;
+const showBorder        = blok.show_border ?? true;
 const announcementOn    = blok.announcement_enabled ?? false;
 const loginOn           = blok.login_enabled ?? false;
 const navItems          = blok.nav_items || [];
@@ -53,7 +54,7 @@ const announcementHref  = blok.announcement_link_url?.url || blok.announcement_l
 )}
 
 <header
-  class:list={['site-header', sticky && 'site-header--sticky']}
+  class:list={['site-header', sticky && 'site-header--sticky', showBorder && 'site-header--border']}
   {...storyblokEditable(blok)}
 >
   <div class="site-header__inner">
@@ -438,10 +439,13 @@ const announcementHref  = blok.announcement_link_url?.url || blok.announcement_l
   /* ── Site Header ────────────────────────────────────────────── */
   .site-header {
     background: var(--p-color-bg-primary);
-    border-bottom: var(--p-border-width-default) solid var(--p-color-border-default);
     padding: 0 var(--p-space-6);
     position: relative;
     z-index: 100;
+  }
+
+  .site-header--border {
+    border-bottom: var(--p-border-width-default) solid var(--p-color-border-default);
   }
 
   .site-header--sticky {
@@ -480,6 +484,7 @@ const announcementHref  = blok.announcement_link_url?.url || blok.announcement_l
   .site-nav__list {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: var(--p-space-1);
     list-style: none;
     margin: 0;

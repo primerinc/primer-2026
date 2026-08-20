@@ -18,12 +18,13 @@ const columns          = blok.columns || [];
 const socialLinks      = blok.social_links || [];
 const legalLinks       = blok.legal_links || [];
 const newsletterOn     = blok.newsletter_enabled ?? false;
+const hasColumnsSection = columns.length > 0 || newsletterOn;
 ---
 
 <footer class="site-footer" {...storyblokEditable(blok)}>
   <div class="site-footer__inner">
 
-    <div class="site-footer__top">
+    <div class:list={['site-footer__top', !hasColumnsSection && 'site-footer__top--no-columns']}>
 
       <div class="site-footer__brand">
         <a href="/" class="site-footer__logo">
@@ -56,6 +57,7 @@ const newsletterOn     = blok.newsletter_enabled ?? false;
         )}
       </div>
 
+      {hasColumnsSection && (
       <div class="site-footer__columns">
         {columns.map((col: any) => {
           const links = col.links || [];
@@ -92,6 +94,7 @@ const newsletterOn     = blok.newsletter_enabled ?? false;
           </div>
         )}
       </div>
+      )}
 
     </div>
 
@@ -135,10 +138,22 @@ const newsletterOn     = blok.newsletter_enabled ?? false;
     border-bottom: var(--p-border-width-default) solid color-mix(in srgb, var(--p-color-text-inverse) 10%, transparent);
   }
 
-  /* ── Brand column ───────────────────────────────────────────── */
+  /* No footer columns/newsletter — brand row spans the full width instead
+     of sitting cramped in a fixed 240px track with empty space beside it. */
+  .site-footer__top--no-columns {
+    grid-template-columns: 1fr;
+  }
+
+  /* ── Brand row ──────────────────────────────────────────────── */
+  .site-footer__brand {
+    display: flex;
+    align-items: center;
+    gap: var(--p-space-10);
+  }
+
   .site-footer__logo {
     display: inline-flex;
-    margin-bottom: var(--p-space-4);
+    flex-shrink: 0;
     text-decoration: none;
   }
 
@@ -157,14 +172,15 @@ const newsletterOn     = blok.newsletter_enabled ?? false;
     font-weight: var(--p-font-weight-light);
     color: color-mix(in srgb, var(--p-color-text-inverse) 60%, transparent);
     line-height: var(--p-font-leading-normal);
-    margin-bottom: var(--p-space-6);
+    flex: 1 1 0;
+    min-width: 0;
   }
 
   /* ── Social ─────────────────────────────────────────────────── */
   .site-footer__social {
     display: flex;
     gap: var(--p-space-3);
-    margin-top: var(--p-space-2);
+    flex-shrink: 0;
   }
 
   .site-footer__social-link {

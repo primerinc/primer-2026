@@ -31,6 +31,7 @@
   ],
   "author": "Primer <hello@primerinc.com>",
   "dependencies": {
+    "@astrojs/cloudflare": "^13.7.0",
     "@astrojs/node": "^10.1.4",
     "@storyblok/astro": "^9.0.12",
     "astro": "^6.4.6",

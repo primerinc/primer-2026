@@ -3,7 +3,7 @@
  * FeatureGrid
  * Storyblok block name: feature_grid
  *
- * Fields: eyebrow, headline, subheadline, features (blocks → feature_item), columns
+ * Fields: eyebrow, headline, subheadline, features (blocks → feature_item), columns, item_style, anchor_id
  */
 import { storyblokEditable } from '@storyblok/astro';
 import type { SbBlokData } from '@storyblok/astro';
@@ -13,9 +13,10 @@ const { blok } = Astro.props;
 const columns   = blok.columns || 3;
 const textAlign = blok.text_align || 'center';
 const bg        = blok.background || 'primary';
+const itemStyle = blok.item_style || 'card';
 ---
 
-<section {...storyblokEditable(blok)} class:list={['features', `features--align-${textAlign}`, `features--bg-${bg}`]}>
+<section {...storyblokEditable(blok)} id={blok.anchor_id || undefined} class:list={['features', `features--align-${textAlign}`, `features--bg-${bg}`, `features--items-${itemStyle}`]}>
   <div class="features__container">
     <div class="features__header">
       {blok.eyebrow && <p class="features__eyebrow">{blok.eyebrow}</p>}
@@ -124,6 +125,16 @@ const bg        = blok.background || 'primary';
     border: var(--p-border-width-default) solid var(--p-color-border-default);
     border-radius: var(--p-radius-card);
     padding: var(--p-space-8);
+  }
+
+  /* Flat item style: plain title+description, no card chrome — for grids
+     where the section background already reads fine behind bare text
+     (e.g. content that doesn't need visual separation between items). */
+  .features--items-flat .feature-card {
+    background: none;
+    border: none;
+    border-radius: 0;
+    padding: 0;
   }
 
   .feature-card__icon {

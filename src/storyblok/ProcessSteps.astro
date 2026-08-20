@@ -3,7 +3,7 @@
  * ProcessSteps
  * Storyblok block name: process_steps
  *
- * Fields: eyebrow, headline, subheadline, steps (blocks → process_step), layout, background
+ * Fields: eyebrow, headline, subheadline, steps (blocks → process_step), layout, background, anchor_id
  * process_step fields: title, body
  */
 import { storyblokEditable } from '@storyblok/astro';
@@ -23,6 +23,7 @@ const steps: ProcessStep[] = blok.steps ?? [];
 
 <section
   {...storyblokEditable(blok)}
+  id={blok.anchor_id || undefined}
   class:list={['process-steps', `process-steps--${layout}`, `process-steps--bg-${bg}`]}
 >
   <div class="process-steps__inner">
@@ -30,7 +31,7 @@ const steps: ProcessStep[] = blok.steps ?? [];
     {layout === 'horizontal' && (
       <>
         {(blok.eyebrow || blok.headline || blok.subheadline) && (
-          <div class="process-steps__header process-steps__header--centered">
+          <div class="process-steps__header">
             {blok.eyebrow    && <p class="process-steps__eyebrow">{blok.eyebrow}</p>}
             {blok.headline   && <h2 class="process-steps__headline">{blok.headline}</h2>}
             {blok.subheadline && <p class="process-steps__sub">{blok.subheadline}</p>}
@@ -120,6 +121,7 @@ const steps: ProcessStep[] = blok.steps ?? [];
     font-weight: var(--p-font-weight-light);
     color: var(--p-color-text-secondary);
     line-height: var(--p-font-leading-relaxed);
+    max-width: var(--p-container-narrow);
   }
 
   /* ── Badge ── */
@@ -154,12 +156,6 @@ const steps: ProcessStep[] = blok.steps ?? [];
   }
 
   /* ── Horizontal layout ── */
-  .process-steps__header--centered {
-    text-align: center;
-    max-width: var(--p-container-sm);
-    margin: 0 auto var(--p-space-16);
-  }
-
   .process-steps__grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(11.25rem, 1fr)); /* 180px */
@@ -185,6 +181,7 @@ const steps: ProcessStep[] = blok.steps ?? [];
   .process-steps__header {
     position: sticky;
     top: var(--p-space-10);
+    margin-bottom: var(--p-space-16);
   }
 
   .process-steps__header .process-steps__headline {

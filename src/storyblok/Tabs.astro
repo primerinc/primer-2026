@@ -3,7 +3,7 @@
  * Tabs
  * Storyblok block name: tabs
  *
- * Fields: eyebrow, headline, subheadline, items (blocks → tab_item), layout
+ * Fields: eyebrow, headline, subheadline, items (blocks → tab_item), layout, anchor_id
  * tab_item fields: label, title, body, image
  */
 import { storyblokEditable } from '@storyblok/astro';
@@ -25,7 +25,7 @@ const items: TabItem[] = blok.items ?? [];
 const uid = `tabs-${blok._uid}`;
 ---
 
-<section {...storyblokEditable(blok)} class:list={['tabs', `tabs--${layout}`, `tabs--bg-${bg}`]} data-tabs>
+<section {...storyblokEditable(blok)} id={blok.anchor_id || undefined} class:list={['tabs', `tabs--${layout}`, `tabs--bg-${bg}`]} data-tabs>
   <div class="tabs__inner">
     {(blok.eyebrow || blok.headline || blok.subheadline) && (
       <div class="tabs__header">
@@ -191,9 +191,7 @@ const uid = `tabs-${blok._uid}`;
   }
 
   .tabs__header {
-    max-width: var(--p-container-narrow);
-    margin: 0 auto var(--p-space-12);
-    text-align: center;
+    margin-bottom: var(--p-space-12);
   }
 
   .tabs__eyebrow {
@@ -219,6 +217,7 @@ const uid = `tabs-${blok._uid}`;
     font-weight: var(--p-font-weight-light);
     color: var(--p-color-text-secondary);
     line-height: var(--p-font-leading-normal);
+    max-width: var(--p-container-narrow);
   }
 
   /* ── Horizontal layout (default) ── */
