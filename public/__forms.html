@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Form registration stub</title></head>
+<body>
+  <!--
+    Not a real page — never linked to, never rendered by the app. This repo
+    runs SSR (output: 'server'), and Netlify's Forms feature only detects
+    forms by scanning static HTML at build time. An SSR site never produces
+    that, so ContactForm.astro's real, JS-submitted form is invisible to
+    Netlify's build-time crawler. This static stub — plain HTML, copied
+    verbatim from public/ into the build output — is what Netlify actually
+    scans and registers. Its form `name` and every field `name` here must
+    stay in exact sync with ContactForm.astro's Netlify-fallback path
+    (name="contact", see `netlifyFormName` there) or new/renamed fields
+    silently stop being captured.
+  -->
+  <form name="contact" data-netlify="true" netlify-honeypot="bot-field" hidden>
+    <input type="text" name="name" />
+    <input type="email" name="email" />
+    <input type="tel" name="phone" />
+    <input type="text" name="company" />
+    <textarea name="message"></textarea>
+    <input name="bot-field" />
+  </form>
+</body>
+</html>

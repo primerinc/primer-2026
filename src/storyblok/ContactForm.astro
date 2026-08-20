@@ -12,13 +12,22 @@
  * Lock 8 client stays in the HubSpot ecosystem for form management unless
  * a specific client is noted otherwise, so hubspot_portal_id/hubspot_form_id
  * should be filled in on every client build. The Netlify Forms path below
- * is a fallback only, and it's a known-fragile one: this repo runs SSR
- * (output: 'server', see CLAUDE.md's "Rendering mode" section), and
- * Netlify's form-detection parses prerendered HTML at build time — an
- * SSR-only site never produces that artifact, so data-netlify="true" is
- * unlikely to actually register the form on a real Netlify deploy. Don't
- * rely on the fallback for a real client; it exists for a non-HubSpot,
- * non-Netlify future case, not as a supported default.
+ * is a fallback for a non-HubSpot client (used for primer-2026 as of
+ * 2026-08-20, since Option B — a per-block Storyblok email field wired to
+ * a transactional email API — needs a third-party account/API key not yet
+ * set up).
+ *
+ * This repo runs SSR (output: 'server'), and Netlify's form-detection
+ * only scans prerendered static HTML at build time — an SSR-only site
+ * never produces that, so the real form here would be invisible to it.
+ * The fix is public/__forms.html: a plain static stub form (never linked
+ * to, never rendered) with the same form `name` ("contact") and field
+ * names as this component's Netlify path — Netlify's build scans that
+ * file and registers the form, and the real page submits to it via fetch.
+ * Keep both in sync: a field added/renamed here needs the same change in
+ * the stub, or it silently stops being captured. Submission notifications
+ * (e.g. emailing a specific address) are configured in the Netlify
+ * dashboard under Forms — not a per-block Storyblok field with this path.
  */
 import { storyblokEditable } from '@storyblok/astro';
 
@@ -30,7 +39,8 @@ const showPhone        = blok.show_phone        ?? false;
 const showCompany      = blok.show_company      ?? false;
 const submitLabel      = blok.submit_label      || 'Send message';
 const successMsg       = blok.success_message   || "Thanks — we'll be in touch soon.";
-const formName         = `contact-${blok._uid}`;
+const formName         = `contact-${blok._uid}`; // per-instance, used only for label/input ids
+const netlifyFormName  = 'contact'; // stable — must match the static stub form in public/__forms.html so Netlify's build-time form detection can register it
 const hubspotPortalId  = blok.hubspot_portal_id || '';
 const hubspotFormId    = blok.hubspot_form_id   || '';
 const useHubspot       = !!(hubspotPortalId && hubspotFormId);
@@ -84,7 +94,7 @@ const useHubspot       = !!(hubspotPortalId && hubspotFormId);
       )}
 
       <form
-        name={formName}
+        name={useHubspot ? formName : netlifyFormName}
         method="POST"
         data-netlify={useHubspot ? undefined : 'true'}
         netlify-honeypot={useHubspot ? undefined : 'bot-field'}
@@ -93,7 +103,7 @@ const useHubspot       = !!(hubspotPortalId && hubspotFormId);
         data-hs-portal={hubspotPortalId || undefined}
         data-hs-form={hubspotFormId || undefined}
       >
-        {!useHubspot && <input type="hidden" name="form-name" value={formName} />}
+        {!useHubspot && <input type="hidden" name="form-name" value={netlifyFormName} />}
         {!useHubspot && (
           <p class="contact__honeypot" aria-hidden="true">
             <label>Skip this: <input name="bot-field" tabindex="-1" autocomplete="off" /></label>
