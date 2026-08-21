@@ -11,39 +11,35 @@
  * HubSpot is the default/expected form backend as of 2026-08-14 — every
  * Lock 8 client stays in the HubSpot ecosystem for form management unless
  * a specific client is noted otherwise, so hubspot_portal_id/hubspot_form_id
- * should be filled in on every client build. The Netlify Forms path below
- * is a fallback for a non-HubSpot client (used for primer-2026 as of
- * 2026-08-20, since Option B — a per-block Storyblok email field wired to
- * a transactional email API — needs a third-party account/API key not yet
- * set up).
+ * should be filled in on every client build. Web3Forms is the fallback for
+ * a non-HubSpot client (used for primer-2026 as of 2026-08-21, replacing
+ * the earlier Netlify Forms fallback ahead of this site's Netlify →
+ * Cloudflare hosting migration — Netlify Forms has no Cloudflare
+ * equivalent, whereas Web3Forms is a plain public POST endpoint with no
+ * hosting-platform dependency at all).
  *
- * This repo runs SSR (output: 'server'), and Netlify's form-detection
- * only scans prerendered static HTML at build time — an SSR-only site
- * never produces that, so the real form here would be invisible to it.
- * The fix is public/__forms.html: a plain static stub form (never linked
- * to, never rendered) with the same form `name` ("contact") and field
- * names as this component's Netlify path — Netlify's build scans that
- * file and registers the form, and the real page submits to it via fetch.
- * Keep both in sync: a field added/renamed here needs the same change in
- * the stub, or it silently stops being captured. Submission notifications
- * (e.g. emailing a specific address) are configured in the Netlify
- * dashboard under Forms — not a per-block Storyblok field with this path.
+ * Web3Forms needs one site-wide access key (WEB3FORMS_ACCESS_KEY in .env,
+ * from https://web3forms.com — free tier, no backend required since it's
+ * designed to be called directly from client-side JS) rather than a
+ * per-block Storyblok field, since unlike HubSpot's portal/form ID this
+ * key isn't meaningfully different per block instance. Submission
+ * notifications are configured in the Web3Forms dashboard, not here.
  */
 import { storyblokEditable } from '@storyblok/astro';
 
 const { blok } = Astro.props;
 
-const layout           = blok.layout            || 'centered';
-const bg               = blok.background        || 'primary';
-const showPhone        = blok.show_phone        ?? false;
-const showCompany      = blok.show_company      ?? false;
-const submitLabel      = blok.submit_label      || 'Send message';
-const successMsg       = blok.success_message   || "Thanks — we'll be in touch soon.";
-const formName         = `contact-${blok._uid}`; // per-instance, used only for label/input ids
-const netlifyFormName  = 'contact'; // stable — must match the static stub form in public/__forms.html so Netlify's build-time form detection can register it
-const hubspotPortalId  = blok.hubspot_portal_id || '';
-const hubspotFormId    = blok.hubspot_form_id   || '';
-const useHubspot       = !!(hubspotPortalId && hubspotFormId);
+const layout            = blok.layout            || 'centered';
+const bg                = blok.background        || 'primary';
+const showPhone         = blok.show_phone        ?? false;
+const showCompany       = blok.show_company      ?? false;
+const submitLabel       = blok.submit_label      || 'Send message';
+const successMsg        = blok.success_message   || "Thanks — we'll be in touch soon.";
+const formName          = `contact-${blok._uid}`; // per-instance, used only for label/input ids
+const hubspotPortalId   = blok.hubspot_portal_id || '';
+const hubspotFormId     = blok.hubspot_form_id   || '';
+const useHubspot        = !!(hubspotPortalId && hubspotFormId);
+const web3formsKey      = import.meta.env.WEB3FORMS_ACCESS_KEY || '';
 ---
 
 <section {...storyblokEditable(blok)} id={blok.anchor_id || undefined} class:list={['contact', `contact--${layout}`, `contact--bg-${bg}`]}>
@@ -94,19 +90,19 @@ const useHubspot       = !!(hubspotPortalId && hubspotFormId);
       )}
 
       <form
-        name={useHubspot ? formName : netlifyFormName}
+        name={formName}
         method="POST"
-        data-netlify={useHubspot ? undefined : 'true'}
-        netlify-honeypot={useHubspot ? undefined : 'bot-field'}
         class="contact__form"
         data-contact-form
         data-hs-portal={hubspotPortalId || undefined}
         data-hs-form={hubspotFormId || undefined}
+        data-web3forms-key={!useHubspot ? web3formsKey : undefined}
       >
-        {!useHubspot && <input type="hidden" name="form-name" value={netlifyFormName} />}
         {!useHubspot && (
           <p class="contact__honeypot" aria-hidden="true">
-            <label>Skip this: <input name="bot-field" tabindex="-1" autocomplete="off" /></label>
+            {/* Web3Forms' own spam-check convention: a hidden field named
+               "botcheck" that must arrive empty. */}
+            <label>Skip this: <input name="botcheck" tabindex="-1" autocomplete="off" /></label>
           </p>
         )}
 
@@ -254,20 +250,20 @@ const useHubspot       = !!(hubspotPortalId && hubspotFormId);
 
           if (!res.ok) throw new Error(`HubSpot ${res.status}`);
         } else {
-          // ── Netlify Forms fallback ─────────────────────────────
-          // Posting to '/' would hit this SSR site's own Astro function,
-          // which just re-renders the page and swallows the submission —
-          // Netlify's form-processing layer never sees it. Posting to the
-          // static stub page instead (public/__forms.html, not routed
-          // through the SSR function) lets Netlify actually intercept it.
-          const params = new URLSearchParams();
-          new FormData(f).forEach((val, key) => params.append(key, String(val)));
-          const res = await fetch('/__forms.html', {
+          // ── Web3Forms fallback ──────────────────────────────────
+          const accessKey = f.dataset.web3formsKey;
+          if (!accessKey) throw new Error('Missing WEB3FORMS_ACCESS_KEY');
+
+          const fd   = new FormData(f);
+          const body: Record<string, string> = { access_key: accessKey };
+          fd.forEach((val, key) => { body[key] = String(val); });
+
+          const res = await fetch('https://api.web3forms.com/submit', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: params.toString(),
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify(body),
           });
-          if (!res.ok) throw new Error(`Netlify Forms ${res.status}`);
+          if (!res.ok) throw new Error(`Web3Forms ${res.status}`);
         }
 
         const wrap    = f.closest('.contact__form-wrap');
