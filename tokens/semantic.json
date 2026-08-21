@@ -202,6 +202,9 @@
       "heading-xs": {
         "value": "{font.size.lg}"
       },
+      "body": {
+        "value": "1.0625rem"
+      },
       "body-lg": {
         "value": "{font.size.lg}"
       },

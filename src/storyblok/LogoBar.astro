@@ -41,8 +41,19 @@ const MARQUEE_REPEATS = 10;
 const marqueeLogos: LogoItem[] = Array.from({ length: MARQUEE_REPEATS }, () => logos).flat();
 
 function imgSrc(logo: LogoItem) {
+  // Fix ONE axis only (height) and let Storyblok scale width proportionally
+  // (width 0 = auto). Requesting both axes (e.g. /m/200x80/) forces every
+  // logo into an identical canvas — Storyblok fits the logo inside that
+  // canvas preserving its own aspect ratio and pads the rest with
+  // transparency, and that padding gets baked into the delivered pixels.
+  // A wide/short logo (a wordmark) ends up with large transparent bands
+  // above/below baked into the file, so it renders far smaller than a
+  // logo whose aspect ratio happens to match the canvas — no client-side
+  // CSS can undo padding that's already inside the raster. Fixing only
+  // height means the delivered image's canvas always tightly matches its
+  // real content, for any aspect ratio a client uploads.
   return logo.image?.filename
-    ? `${logo.image.filename}/m/200x80/filters:quality(90)`
+    ? `${logo.image.filename}/m/0x160/filters:quality(90)`
     : '';
 }
 ---
@@ -57,11 +68,11 @@ function imgSrc(logo: LogoItem) {
           <li class="logo-bar__item">
             {logo.url && (
               <a href={logo.url} class="logo-bar__link" aria-label={logo.alt} tabindex={i >= logos.length ? -1 : 0}>
-                <img {...imageSize(logo.image?.filename, 200, 80)} src={imgSrc(logo)} alt={logo.alt ?? ''} class="logo-bar__img" loading="lazy" />
+                <img {...imageSize(logo.image?.filename, 0, 160)} src={imgSrc(logo)} alt={logo.alt ?? ''} class="logo-bar__img" loading="lazy" />
               </a>
             )}
             {!logo.url && (
-              <img {...imageSize(logo.image?.filename, 200, 80)} src={imgSrc(logo)} alt={i < logos.length ? (logo.alt ?? '') : ''} class="logo-bar__img" loading="lazy" />
+              <img {...imageSize(logo.image?.filename, 0, 160)} src={imgSrc(logo)} alt={i < logos.length ? (logo.alt ?? '') : ''} class="logo-bar__img" loading="lazy" />
             )}
           </li>
         ))}
@@ -76,11 +87,11 @@ function imgSrc(logo: LogoItem) {
           <li class="logo-bar__item" {...storyblokEditable(logo as any)}>
             {logo.url && (
               <a href={logo.url} class="logo-bar__link" aria-label={logo.alt}>
-                <img {...imageSize(logo.image?.filename, 200, 80)} src={imgSrc(logo)} alt={logo.alt ?? ''} class="logo-bar__img" loading="lazy" />
+                <img {...imageSize(logo.image?.filename, 0, 160)} src={imgSrc(logo)} alt={logo.alt ?? ''} class="logo-bar__img" loading="lazy" />
               </a>
             )}
             {!logo.url && (
-              <img {...imageSize(logo.image?.filename, 200, 80)} src={imgSrc(logo)} alt={logo.alt ?? ''} class="logo-bar__img" loading="lazy" />
+              <img {...imageSize(logo.image?.filename, 0, 160)} src={imgSrc(logo)} alt={logo.alt ?? ''} class="logo-bar__img" loading="lazy" />
             )}
           </li>
         ))}
@@ -153,12 +164,12 @@ function imgSrc(logo: LogoItem) {
   .logo-bar__track {
     display: flex;
     align-items: center;
-    gap: var(--p-space-20);
+    gap: calc(var(--p-space-24) * 2); /* 2x the already-widened spacing */
     list-style: none;
     padding: 0;
     margin: 0;
     width: max-content;
-    animation: logo-marquee 125s linear infinite;
+    animation: logo-marquee 275s linear infinite; /* 220s slowed another 25% */
   }
 
   .logo-bar__track-wrap:hover .logo-bar__track {
@@ -190,9 +201,24 @@ function imgSrc(logo: LogoItem) {
   .logo-bar__link { display: block; }
 
   .logo-bar__img {
-    height: 2.25rem; /* 36px */
+    /* Height-only sizing, not a fixed box. A fixed width×height box forces
+       object-fit: contain to scale each logo against whichever axis of the
+       box its own aspect ratio hits first — since the box itself is wide
+       and short (140x40 ≈ 3.5:1), a squarish mark (e.g. a ~2:1 badge) hits
+       the height limit and fills the box edge-to-edge, while a long thin
+       wordmark (e.g. ~6.6:1) hits the width limit and ends up rendering
+       far shorter than 40px. That's what made some logos read as much
+       bigger/smaller than others even though every box was identical.
+       Matching every logo to the same cap-height and letting width flow
+       naturally (the standard "as featured in" logo-bar pattern) is what
+       actually reads as uniform. max-width stays only as a safety net for
+       a pathologically wide upload — it should not engage for ordinary
+       logos. */
+    display: block; /* avoid the inline-replaced-element baseline gap that
+                        misaligned logos wrapped in a link vs. bare ones */
+    height: 1.4625rem; /* 23.4px — 36px scaled down 35% */
     width: auto;
-    max-width: 8.75rem; /* 140px */
+    max-width: 8.9375rem; /* 143px safety net (scaled with height), not a design constraint */
     object-fit: contain;
     opacity: 0.55;
     filter: grayscale(100%);
